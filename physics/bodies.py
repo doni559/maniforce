@@ -1,9 +1,13 @@
-from . import *
+from pygame import sprite
+
+from dataclasses import dataclass
+from typing import List, Tuple
+from math import radians, pi
 
 from .collider import Collider
 
 from .utils import Vector
-
+from settings import SUBSTEPS, GRAV_CONST
 
 @dataclass(frozen=True)
 class ObjectConfig():
@@ -94,10 +98,13 @@ class PhysicalObject(sprite.Sprite):
                     + next_point.y**2
                 )
                 center_mass+= sector_center* sector_mass
-    
+            
             self.volume = total_volume
             self.mass = self.volume*self.density
-            self.pos += center_mass /self.mass
+
+            center_mass /= self.mass
+            self.pos += center_mass.rotate(self.angle)
+
             #steiner theorem
             self.moment_of_inertia=total_moment_of_inertia - self.mass* center_mass.get_length()**2
             self.collider = Collider(collider_type,

@@ -11,8 +11,6 @@ class UX():
         self.font = font.SysFont(name="FontDefault", size=font_size)
 
     def draw_text(self,text : str, position: Tuple[int], color: Tuple[int], bg: Tuple[int], screen : Surface):
-        
-        
         screen.blit(self.font.render(text, True, color, bg), position)
         
     def display_fps(self, screen : Surface, clock: Clock):

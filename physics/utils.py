@@ -12,15 +12,8 @@ class Vector():
         return sqrt(self.x**2 + self.y**2)
 
     def normalise(self):
-        try:
-            new_x = self.x / sqrt(self.x**2 + self.y**2)
-            if self.y < 0:
-                new_y = -sqrt(1-new_x**2)
-            else:
-                new_y = sqrt(1-new_x**2)
-            return Vector(new_x, new_y)
-        except ZeroDivisionError:
-            return Vector(0, 0)
+        L=self.get_length()
+        return Vector(self.x/L, self.y/L)
 
     def scalar_multiply(self, other_vector) -> float:
         return self.x * other_vector.x + self.y * other_vector.y

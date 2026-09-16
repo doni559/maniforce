@@ -29,8 +29,9 @@ class Scene():
     def render_scene(self, screen:Surface, clock: Clock, dt: float):
         screen.fill((255, 255, 255))
         for _ in range(0,SUBSTEPS):
-            self.collisions.calculate_collisions_penalty()
             self.sprites.update(dt)
+            self.collisions.calculate_collisions_penalty()
+
         for sprite in self.sprites.sprites():
             if isinstance(sprite, Pendulum) and sprite.rope_exists:
                 sprite : Pendulum= sprite
@@ -63,6 +64,7 @@ class Scene():
             obstacle.collider.draw(screen, (0,0,0))
     def add_object(self, object: PhysicalObject):
         self.sprites.add(object)
+        self.objects.append(object)
 
         self.collisions = CollisionCalculator(self.sprites, self.obsctacles)
 

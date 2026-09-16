@@ -1,6 +1,9 @@
-from . import *
+from pygame import draw
+
+from typing import Tuple, List
 
 from .utils import Vector
+from settings import HEIGHT, EPS
 
 class Collider():
     def __init__(self, collider_type : str , center : Vector,**kwargs):
@@ -39,7 +42,7 @@ class Collider():
             contact_points=[]
             if deformation > 0:
                 contact_points.append({
-                    "pos":object.pos+normal*self.radius,
+                    "pos":object.pos-normal*self.radius,
                     "deformation":deformation
                 })
             return normal, contact_points
@@ -147,7 +150,7 @@ class Collider():
             if deformation > 0:
                 contact_points.append(
                     {
-                        "pos":another_object_pos-normal*another_collider.radius,
+                        "pos":another_object_pos+normal*another_collider.radius,
                         "deformation":deformation
                     }
                 )       

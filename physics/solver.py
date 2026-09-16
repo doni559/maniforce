@@ -1,8 +1,12 @@
-from . import *
+from pygame import sprite
+
+from typing import List
+from math import sqrt, log, e as euler, pi
 
 from .bodies import PhysicalObject, Obstacle
 
 from .utils import Vector
+from settings import EPS
 
 class CollisionCalculator():
     def __init__(self, all_sprites : sprite.Group, all_obstacles: List[Obstacle]):
@@ -47,8 +51,11 @@ class CollisionCalculator():
                     spring_force= normal * summary_stiffness_cf * deformation
 
                     mass_efficient = (target_sprite.mass * another_sprite.mass)/(target_sprite.mass+another_sprite.mass)
+                        
                     mixed_restitution= sqrt(target_sprite.restitution * another_sprite.restitution)
-                    damping_ratio = - log(mixed_restitution, euler)/ (sqrt(pi**2 + (log(mixed_restitution, euler))**2 ))
+                    if mixed_restitution == 0:
+                        mixed_restitution=EPS
+                    damping_ratio = - log(mixed_restitution)/ (sqrt(pi**2 + (log(mixed_restitution))**2 ))
                     damping_cf= 2*damping_ratio*sqrt(summary_stiffness_cf*mass_efficient)
 
                     target_rotational_velocity = Vector(
@@ -66,11 +73,17 @@ class CollisionCalculator():
                     relative_velocity=target_dot_contact_velocity-another_dot_contact_velocity
                     radial_velocity : Vector = normal * (relative_velocity.scalar_multiply(normal))
 
+                    tangential_velocity = relative_velocity-radial_velocity
+
                     damping_force = radial_velocity.normalise() *(-1) * damping_cf*radial_velocity.get_length()
                     contact_force= spring_force+damping_force
 
                     #friction_force calc
-                    friction_force = relative_velocity.normalise() * target_sprite.friction_cf * contact_force.get_length() *(-1)
+
+                    #cf must be evaluated due to material data. materials WYP so it will be changed later
+                    common_friction_cf = sqrt(target_sprite.friction_cf*another_sprite.friction_cf)
+
+                    friction_force = tangential_velocity.normalise() *(-1) * common_friction_cf * contact_force.get_length()
                     collision_force = contact_force+friction_force
                     collision_torque_target = target_point_leverarm.vector_multiply(collision_force)
                     collision_torque_another = another_point_leverarm.vector_multiply(collision_force)
@@ -97,7 +110,10 @@ class CollisionCalculator():
                     contact_velocity = target_sprite.velocity+dot_rotational_velocity
                     radial_velocity : Vector = normal * (contact_velocity.scalar_multiply(normal))
 
-                    damping_ratio = - log(target_sprite.restitution, euler)/ (sqrt(pi**2 + (log(target_sprite.restitution, euler))**2 ))
+                    restitution=target_sprite.restitution
+                    if restitution == 0:
+                        restitution=EPS
+                    damping_ratio = - log(restitution)/ (sqrt(pi**2 + (log(restitution))**2 ))
                     damping_cf= 2*damping_ratio*sqrt(target_sprite.stiffness_cf*target_sprite.mass)
                     damping_force : Vector = radial_velocity.normalise()*(-1) * damping_cf * radial_velocity.get_length()
 

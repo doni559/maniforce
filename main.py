@@ -1,8 +1,8 @@
 from pygame import *
 from pygame.time import Clock
-from time import time as t
-from physics import *
+
 from scenes import scene
+from settings import HEIGHT, WIDTH
 
 from typing import Tuple
 

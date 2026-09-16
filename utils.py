@@ -1,9 +1,7 @@
 from math import sqrt, sin, cos
 from pygame import draw
-# from physics import HEIGHT
 
-#DO SOMETHING WITH THIS SHIT
-HEIGHT=600
+from settings import HEIGHT
 
 class Vector():
     def __init__(self, x, y):

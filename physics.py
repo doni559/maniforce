@@ -6,16 +6,7 @@ from dataclasses import dataclass
 from pygame import *
 from utils import *
 
-
-#CONSTANTS
-FPS=250
-WIDTH=800
-HEIGHT=600
-GRAV_CONST=981
-SUBSTEPS=5
-
-
-
+from settings import SUBSTEPS, GRAV_CONST, EPS
 
 
 @dataclass(frozen=True)
@@ -43,33 +34,6 @@ class ObjectConfig():
     is_rope_breakable : bool | None = None
     pendulum_friction : bool | None = None
 
-rubber_ball = ObjectConfig(
-    "rubber_ball",
-    radius=25,
-    stiffnes_cf=1000,
-    density=1,
-    friction_cf=0.2,
-    restitution=0.8,
-    gravity=True,
-    draw_trajectory=True
-)
-rubber_ball_pendulum = ObjectConfig(
-    name = "rubber_ball_pendulum",
-    density=1,
-    radius=50,
-    gravity=True,
-    draw_trajectory=False,
-    rope_stiffness_cf=2000,
-    restitution=1,
-    stiffnes_cf=1000,
-    friction_cf=0,
-    rope_dampfing_cf=200,
-    rope_force_limit=100000,
-    rope_exists=True,
-    is_rope_breakable=True,
-    pendulum_friction= False
-)
-
 class Collider():
     def __init__(self, collider_type : str , center : Vector,**kwargs):
         possible_types = [
@@ -85,24 +49,15 @@ class Collider():
         if self.type == "Circle":
             self.radius = kwargs["radius"]
         if self.type in ["Box", "Polygon"]:
-            # self.corners= [
-            #     Vector(kwargs["x0"], kwargs["y0"]),
-            #     Vector(kwargs["x1"], kwargs["y0"]),
-            #     Vector(kwargs["x1"], kwargs["y1"]),
-            #     Vector(kwargs["x0"], kwargs["y1"]),
-            # ]
             self.relative_corners = kwargs["corners"]
             world_corners = [Vector(center.x+point.x, center.y+point.y) for point in kwargs["corners"]]
             self.corners = world_corners
-        # if self.type == "Polygon":
-            
         
     def draw(self, screen, color, center : Tuple[int] | None = None):
         if (self.type == "Circle"):
             draw.circle(screen, color,center, radius=self.radius)
         if (self.type == "Box" or self.type == "Polygon"):
             draw.polygon(screen,color, [(point.x, HEIGHT-point.y) for point in self.corners])
-
 
     def calculate_deformation(self, another_collider, object , another_object_pos) -> Tuple[Vector, List[dict]]:
         another_collider : Collider = another_collider
@@ -215,8 +170,8 @@ class Collider():
                 penetrations.append(penetration)  
             deformation=min(penetrations)
             index=penetrations.index(deformation)
-            normal = Vector(normals[index].x, normals[index].y)
 
+            normal = Vector(normals[index].x, normals[index].y)
             contact_points=[]
             distance : Vector = another_object_pos- object.pos
             if distance.scalar_multiply(normal) > 0:
@@ -227,12 +182,8 @@ class Collider():
                         "pos":another_object_pos-normal*another_collider.radius,
                         "deformation":deformation
                     }
-                )
-
-                        
+                )       
             return normal, contact_points
-
-
 
         if (self.type in ["Box", "Polygon"] and another_collider.type in ["Box", "Polygon"]):
             #SAT
@@ -306,8 +257,6 @@ class Collider():
                         max_scalar_normal = normals[i].scalar_multiply(normal)
                         reference_index=i
                 
-
-                
             else:
                 reference_index=index-len(another_collider.corners)
                 reference = self
@@ -321,7 +270,6 @@ class Collider():
                     if normals[i].scalar_multiply(normal) > max_scalar_normal:
                         max_scalar_normal = normals[i].scalar_multiply(normal)
                         reference_index=i-len(another_collider.corners)
-
     
             reference_p0=reference.corners[reference_index]
             reference_p1=reference.corners[(reference_index + 1) % len(reference.corners)]
@@ -348,13 +296,8 @@ class Collider():
             tangent_L=(reference_p1-reference_p0).get_length()
             tangent : Vector = (reference_p1-reference_p0).normalise()
 
-
-
             s0=(incident_p0-reference_p0).scalar_multiply(tangent)
             s1=(incident_p1-reference_p0).scalar_multiply(tangent)
-
-            #REPLACE TO CONSTANTSS PLEEEEEEEEEEEEEEEEEASE
-            EPS=0.001
 
             if abs(s1 - s0) < EPS:
                 clipped_p0, clipped_p1 = incident_p0, incident_p1
@@ -395,33 +338,16 @@ class Collider():
                 normal *= -1
             return normal, contact_points
 
-            # nontransformated_normal=normals[index]
-            
-
-            # if normal.x != 0:
-            #     print(normal, distance, another_object_pos, object.pos)
-            #     raise
-
-            
-
-
-            
-                
-
-
-
 class PhysicalObject(sprite.Sprite):
-    def __init__(self, config=rubber_ball, start_pos = Vector(0,0), start_velocity= Vector(0,0), start_angle=0, start_angular_velocity=0, collider_type="Circle" , name="Object0"):
+    def __init__(self, config: ObjectConfig, start_pos = Vector(0,0), start_velocity= Vector(0,0), start_angle=0, start_angular_velocity=0, collider_type="Circle" , name="Object0"):
         sprite.Sprite.__init__(self)
         self.type="PhysicalObject"
         self.name = name
         self.config= config
-
         
         self.velocity = start_velocity
         self.acceleration = Vector(0,0)
         self.pos = start_pos
-
 
         self.angle = radians(start_angle)
         self.angular_velocity=radians(start_angular_velocity)
@@ -443,6 +369,10 @@ class PhysicalObject(sprite.Sprite):
         #Constants
         self.density =config.density
         self.calibrating_length=10**-6
+                
+        ##System Flags
+        self.gravity=config.gravity
+        self.draw_trajectory=config.draw_trajectory
 
         if collider_type == "Circle":
             self.collider = Collider(collider_type,center=start_pos, radius=config.radius)
@@ -450,25 +380,18 @@ class PhysicalObject(sprite.Sprite):
             self.volume = self.radius**3 * pi * 4/3 /4187666
             self.mass=self.density*self.volume
             self.moment_of_inertia=1/2*self.mass*self.radius**2
-
+    
         if collider_type in ("Box", "Polygon"):
-            #TEST
-            # self.volume=1
-            # self.mass=self.density*self.volume
-            # print(self.mass)
-            # self.moment_of_inertia=10**4
-            # print(self.moment_of_inertia)
-
             total_volume = 0
             total_moment_of_inertia=0
             center_mass=Vector(0,0)
             for index in range(0, len(config.corners)):
                 point = config.corners[index]
                 next_point = config.corners[(index+1) % len(config.corners)]
-
+    
                 sector_volume = abs(point.vector_multiply(next_point))/2 * self.calibrating_length
                 total_volume+= sector_volume
-
+    
                 sector_center = (next_point+point) * (1/3)
                 sector_mass = self.density*sector_volume
                 total_moment_of_inertia += sector_mass / 6 * (
@@ -480,7 +403,7 @@ class PhysicalObject(sprite.Sprite):
                     + next_point.y**2
                 )
                 center_mass+= sector_center* sector_mass
-
+    
             self.volume = total_volume
             self.mass = self.volume*self.density
             self.pos += center_mass /self.mass
@@ -491,54 +414,32 @@ class PhysicalObject(sprite.Sprite):
                         corners = config.corners)
             origin_offset=start_pos-self.pos
             self.origin_offset_local = origin_offset.rotate(-self.angle)
-                
-
-
-
-        ##System Flags
-        self.gravity=config.gravity
-        self.draw_trajectory=config.draw_trajectory
-
-
 
     def calc_position(self, dt):
-        
         self.acceleration = self.resultant_force *(1/ self.mass)
-    
         self.velocity += self.acceleration * dt   
-    
         self.pos += self.velocity*dt
 
-
         self.angular_acceleration =self.resultant_torque/self.moment_of_inertia
-
         self.angular_velocity += self.angular_acceleration *dt
-        
-
         self.angle += self.angular_velocity* dt
+
+        #check if angle is out of bounds
         if self.angle // (2*pi) !=0 and self.angle != (2*pi) :
             self.angle = self.angle - (self.angle//(2*pi)) *2*pi
+
         if (self.collider.type in ("Box", "Polygon")):
-            # relative_сoords = [
-            #     Vector(-self.width/2, -self.height/2),
-            #     Vector(+self.width/2, -self.height/2),
-            #     Vector(+self.width/2, +self.height/2),
-            #     Vector(-self.width/2, +self.height/2)
-            # 
             #changing coordinates from origin to center of mass
             offset = self.origin_offset_local
             relative_coords : List[Vector] = [coord + offset for coord in self.collider.relative_corners ]
             #rotating on angle
             rotated_coords = [coord.rotate(self.angle) for coord in relative_coords]
             #changing back to origin
-
             new_corners= [ 
                 self.pos + rotated_coords[i] for i in range(0, len(rotated_coords))
             ]
             self.collider.corners=new_corners
-        self.collider.center=self.pos
-
-    
+        self.collider.center=self.pos 
     
     def calc_forces(self):
         self.forces.clear()
@@ -549,24 +450,22 @@ class PhysicalObject(sprite.Sprite):
         self.forces.append(self.colliding_force)
         self.colliding_force=Vector(0,0)
         self.torques.append(self.colliding_torque)
-        resultant_force = Vector(0, 0)
-        for force in self.forces:
-            resultant_force.x += force.x
-            resultant_force.y += force.y
-        self.resultant_force = resultant_force
+        # resultant_force = Vector(0, 0)
+        # for force in self.forces:
+        #     resultant_force.x += force.x
+        #     resultant_force.y += force.y
+        # self.resultant_force = resultant_force
     
-        resultant_torque = sum(self.torques)
-        self.resultant_torque = resultant_torque
-
-
+        # resultant_torque = sum(self.torques)
+        # self.resultant_torque = resultant_torque
 
     def update(self, dt):
         self.calc_forces()
         self.calc_position(dt/SUBSTEPS)
         
-
+#WILL BE REMOVED
 class Pendulum(PhysicalObject):
-    def __init__(self, config = rubber_ball_pendulum, start_pos = Vector(0,0), start_velocity= Vector(0,0), start_angle =0,collider_type="Circle", suspension_point = Vector(0,0), name= "Pendulum0"):
+    def __init__(self, config : ObjectConfig, start_pos = Vector(0,0), start_velocity= Vector(0,0), start_angle =0,collider_type="Circle", suspension_point = Vector(0,0), name= "Pendulum0"):
         super().__init__(config, start_pos, start_velocity, start_angle,collider_type, name)
         self.type = "Pendulum"
         #Other things
@@ -606,13 +505,10 @@ class Pendulum(PhysicalObject):
                 rope_force*=0
             if rope_force.get_length() > self.rope_force_limit and self.is_rope_breakable: 
                 self.rope_exists = False
-            self.forces.append(rope_force)
-
-
-
-        
+            self.forces.append(rope_force)   
     def update(self, dt):
         super().update(dt)
+
 
 class Obstacle():
     def __init__(self, x0,x1, y0,y1):
@@ -649,22 +545,18 @@ class CollisionCalculator():
             target_sprite : PhysicalObject=sprites[i]
             try:
                 resulting_forces[i]+=Vector(0,0)
-            except:
-                resulting_forces[i]=Vector(0,0)
-            try:
                 resulting_torques[i]+=0
             except:
+                resulting_forces[i]=Vector(0,0)
                 resulting_torques[i]=0
+
             for j in range(i+1, len(sprites)):
                 try:
                     resulting_forces[j]+=Vector(0,0)
-                except:
-                    resulting_forces[j]=Vector(0,0)
-                try:
                     resulting_torques[j]+=0
                 except:
+                    resulting_forces[j]=Vector(0,0)
                     resulting_torques[j]=0
-                
                 another_sprite : PhysicalObject =sprites[j]
                 
                 normal, contact_points = target_sprite.collider.calculate_deformation(another_sprite.collider, target_sprite, another_sprite.pos)
@@ -686,26 +578,25 @@ class CollisionCalculator():
                     damping_ratio = - log(mixed_restitution, euler)/ (sqrt(pi**2 + (log(mixed_restitution, euler))**2 ))
                     damping_cf= 2*damping_ratio*sqrt(summary_stiffness_cf*mass_efficient)
 
-                    #friction_force calc
-
                     target_rotational_velocity = Vector(
                                             -target_sprite.angular_velocity * target_point_leverarm.y,
                                             target_sprite.angular_velocity * target_point_leverarm.x
                                         )
                     target_dot_contact_velocity = target_sprite.velocity+target_rotational_velocity
                     
-
                     another_rotational_velocity=Vector(
                                             -another_sprite.angular_velocity * another_point_leverarm.y,
                                             another_sprite.angular_velocity * another_point_leverarm.x
                                         )
                     another_dot_contact_velocity= another_sprite.velocity+another_rotational_velocity
+
                     relative_velocity=target_dot_contact_velocity-another_dot_contact_velocity
-                    
                     radial_velocity : Vector = normal * (relative_velocity.scalar_multiply(normal))
+
                     damping_force = radial_velocity.normalise() *(-1) * damping_cf*radial_velocity.get_length()
                     contact_force= spring_force+damping_force
 
+                    #friction_force calc
                     friction_force = relative_velocity.normalise() * target_sprite.friction_cf * contact_force.get_length() *(-1)
                     collision_force = contact_force+friction_force
                     collision_torque_target = target_point_leverarm.vector_multiply(collision_force)
@@ -739,33 +630,17 @@ class CollisionCalculator():
 
                     contact_force=spring_force+damping_force
                     
-
+                    #friction force
                     friction_force = contact_velocity.normalise()*(-1) * target_sprite.friction_cf * contact_force.get_length()
+
                     collision_force=contact_force+friction_force
                     collision_torque = torque_leverarm.vector_multiply(collision_force)
 
 
                     resulting_forces[i]+=collision_force
                     resulting_torques[i]+=collision_torque
-                    
-
 
         for key, value in resulting_forces.items():
             sprites[key].colliding_force=value
         for key, value in resulting_torques.items():
             sprites[key].colliding_torque=value
-
-# class ObstaclesRenderer():
-#     def __init__(self, obstacles: List[Obstacle]):
-#         self.obstacles= obstacles
-
-#     def render(self):
-#         for obst in self.obstacles:
-#             corners=[
-#                 (obst.x0, HEIGHT-obst.y0),
-#                 (obst.x0, HEIGHT-obst.y1),
-#                 (obst.x1, HEIGHT-obst.y1),
-#                 (obst.x1, HEIGHT-obst.y0)
-#             ]
-
-#             draw.polygon(screen, obst.color, corners)

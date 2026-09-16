@@ -2,15 +2,16 @@ from pygame import *
 from pygame.sprite import Group
 from pygame.time import Clock
 
-from physics import *
-from utils import *
+from physics import CollisionCalculator, PhysicalObject, Obstacle, Pendulum, ObjectConfig
+from utils import Vector
+from settings import WIDTH, HEIGHT, SUBSTEPS, FPS
+
 from typing import List
+
 
 from pathlib import Path
 import json
 from dataclasses import asdict
-
-from math import sin, cos, sqrt
 
 
 
@@ -153,21 +154,34 @@ box_cfg = ObjectConfig(
     gravity=True,
     draw_trajectory=False
 )
-# pendulum = Pendulum(rubber_ball_pendulum, start_pos=Vector(WIDTH/2, HEIGHT/2), start_velocity=Vector(100,0), collider_type="Circle", suspension_point=Vector(WIDTH/2, HEIGHT/2+100), name = "Pendulum0")
-# box= PhysicalObject(box_cfg, start_pos=Vector(300, 200), start_velocity=Vector(100, 0), start_angular_velocity=0, collider_type="Box", name="Box1")
-# box1= PhysicalObject(box_cfg, start_pos=Vector(600, 250), start_velocity=Vector(-100, 0), collider_type="Box", name="Box1")
-# box1= PhysicalObject(box_cfg, start_pos=Vector(310, 150), start_velocity=Vector(0, 0), start_angular_velocity=0, collider_type="Box", name="Box1")
-# box2= PhysicalObject(box_cfg, start_pos=Vector(420, 150), start_velocity=Vector(0, 0), start_angular_velocity=0, collider_type="Box", name="Box1")
-# box3= PhysicalObject(box_cfg, start_pos=Vector(540, 150), start_velocity=Vector(0, 0), start_angular_velocity=0, collider_type="Box", name="Box1")
-# ball = PhysicalObject(rubber_ball, start_pos=Vector(200,55), start_velocity=Vector(100,0), collider_type="Circle", name="Ball1")
-# ball2 = PhysicalObject(rubber_ball, start_pos=Vector(400,25), start_velocity=Vector(-100, 0), collider_type="Circle", name="Ball1")
-# scene1 = Scene([box], screen_borders, "box")
-# scene1.save_scene()
+rubber_ball = ObjectConfig(
+    "rubber_ball",
+    radius=25,
+    stiffnes_cf=1000,
+    density=1,
+    friction_cf=0.2,
+    restitution=0.8,
+    gravity=True,
+    draw_trajectory=True
+)
+rubber_ball_pendulum = ObjectConfig(
+    name = "rubber_ball_pendulum",
+    density=1,
+    radius=50,
+    gravity=True,
+    draw_trajectory=False,
+    rope_stiffness_cf=2000,
+    restitution=1,
+    stiffnes_cf=1000,
+    friction_cf=0,
+    rope_dampfing_cf=200,
+    rope_force_limit=100000,
+    rope_exists=True,
+    is_rope_breakable=True,
+    pendulum_friction= False
+)
+
 polygon = PhysicalObject(box_cfg, start_pos=Vector(300,120), start_velocity=Vector(0,0), start_angular_velocity=0, collider_type="Polygon", name="Box1")
 ball= PhysicalObject(rubber_ball, start_pos=Vector(270,300), start_velocity=Vector(0,0), collider_type="Circle", name="Ball1")
 
-# scene=load_scene("box")
-# scene.add_object(ball)
-
 scene = Scene([polygon, ball], obstacles=screen_borders, name="rotating box")
-# scene.save_scene()

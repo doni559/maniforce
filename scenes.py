@@ -2,9 +2,11 @@ from pygame import *
 from pygame.sprite import Group
 from pygame.time import Clock
 
-from physics import CollisionCalculator, PhysicalObject, Obstacle, Pendulum, ObjectConfig
-from utils import Vector
-from settings import WIDTH, HEIGHT, SUBSTEPS, FPS
+from physics.utils import Vector
+from physics.bodies import PhysicalObject, Obstacle, Pendulum, ObjectConfig
+from physics.solver import CollisionCalculator
+
+from settings import WIDTH, HEIGHT, SUBSTEPS
 
 from typing import List
 
@@ -58,16 +60,7 @@ class Scene():
                 if len(sprite.trajectory_arr) > 1000:
                     sprite.trajectory_arr = sprite.trajectory_arr[-1000:-1]
         for obstacle in self.obsctacles:
-            corners = [
-                (obstacle.x0, HEIGHT-obstacle.y0),
-                (obstacle.x0, HEIGHT-obstacle.y1),
-                (obstacle.x1, HEIGHT-obstacle.y1),
-                (obstacle.x1, HEIGHT-obstacle.y0)
-            ]
-
             obstacle.collider.draw(screen, (0,0,0))
-        display.flip()
-        clock.tick(FPS)
     def add_object(self, object: PhysicalObject):
         self.sprites.add(object)
 

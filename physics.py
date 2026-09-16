@@ -358,23 +358,24 @@ class Collider():
 
             if abs(s1 - s0) < EPS:
                 clipped_p0, clipped_p1 = incident_p0, incident_p1
-            left_border = -s0/(s1-s0)
-            right_border = (tangent_L-s0)/(s1-s0)
-            if (s0 < 0 and s1 < 0) or (s0 > tangent_L and s1 > tangent_L):
-                return Vector(0,0), []
-            if s0 < 0:
-                clipped_p0= incident_p0+(incident_p1-incident_p0)*left_border
-            elif s0 > tangent_L:
-                clipped_p0= incident_p0+(incident_p1-incident_p0)*right_border
             else:
-                clipped_p0=incident_p0
-            if s1 <0:
-                clipped_p1 = incident_p0 +(incident_p1-incident_p0) *  left_border
-            elif s1 > tangent_L:
-                clipped_p1 = incident_p0 +(incident_p1-incident_p0) *  right_border
+                left_border = -s0/(s1-s0)
+                right_border = (tangent_L-s0)/(s1-s0)
+                if (s0 < 0 and s1 < 0) or (s0 > tangent_L and s1 > tangent_L):
+                    return Vector(0,0), []
+                if s0 < 0:
+                    clipped_p0= incident_p0+(incident_p1-incident_p0)*left_border
+                elif s0 > tangent_L:
+                    clipped_p0= incident_p0+(incident_p1-incident_p0)*right_border
+                else:
+                    clipped_p0=incident_p0
+                if s1 <0:
+                    clipped_p1 = incident_p0 +(incident_p1-incident_p0) *  left_border
+                elif s1 > tangent_L:
+                    clipped_p1 = incident_p0 +(incident_p1-incident_p0) *  right_border
 
-            else:
-                clipped_p1 = incident_p1
+                else:
+                    clipped_p1 = incident_p1
 
             deformation_p0 = -(clipped_p0-reference_p0).scalar_multiply(normal)
             deformation_p1 = -(clipped_p1-reference_p0).scalar_multiply(normal)
@@ -482,10 +483,9 @@ class PhysicalObject(sprite.Sprite):
 
             self.volume = total_volume
             self.mass = self.volume*self.density
-            self.pos += center_mass * (1/self.mass)
+            self.pos += center_mass /self.mass
             #steiner theorem
             self.moment_of_inertia=total_moment_of_inertia - self.mass* center_mass.get_length()**2
-            self.pos+= center_mass
             self.collider = Collider(collider_type,
                         center=self.pos,
                         corners = config.corners)
@@ -693,9 +693,7 @@ class CollisionCalculator():
                                             target_sprite.angular_velocity * target_point_leverarm.x
                                         )
                     target_dot_contact_velocity = target_sprite.velocity+target_rotational_velocity
-                    radial_velocity : Vector = normal * (target_dot_contact_velocity.scalar_multiply(normal))
-                    damping_force = radial_velocity.normalise() *(-1) * damping_cf*radial_velocity.get_length()
-                    contact_force= spring_force+damping_force
+                    
 
                     another_rotational_velocity=Vector(
                                             -another_sprite.angular_velocity * another_point_leverarm.y,
@@ -704,6 +702,9 @@ class CollisionCalculator():
                     another_dot_contact_velocity= another_sprite.velocity+another_rotational_velocity
                     relative_velocity=target_dot_contact_velocity-another_dot_contact_velocity
                     
+                    radial_velocity : Vector = normal * (relative_velocity.scalar_multiply(normal))
+                    damping_force = radial_velocity.normalise() *(-1) * damping_cf*radial_velocity.get_length()
+                    contact_force= spring_force+damping_force
 
                     friction_force = relative_velocity.normalise() * target_sprite.friction_cf * contact_force.get_length() *(-1)
                     collision_force = contact_force+friction_force

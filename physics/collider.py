@@ -20,8 +20,8 @@ class Collider():
         if self.type == "Circle":
             self.radius = kwargs["radius"]
         if self.type in ["Box", "Polygon"]:
-            self.relative_corners = kwargs["corners"]
-            world_corners = [Vector(center.x+point.x, center.y+point.y) for point in kwargs["corners"]]
+            self.relative_corners = [Vector(corner[0], corner[1]) for corner in kwargs["corners"]]
+            world_corners = [Vector(center.x+point.x, center.y+point.y) for point in self.relative_corners]
             self.corners = world_corners
         
     def draw(self, screen, color, center : Tuple[int] | None = None):

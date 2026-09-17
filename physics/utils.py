@@ -13,6 +13,8 @@ class Vector():
 
     def normalise(self):
         L=self.get_length()
+        if L == 0:
+            return Vector(0, 0)
         return Vector(self.x/L, self.y/L)
 
     def scalar_multiply(self, other_vector) -> float:

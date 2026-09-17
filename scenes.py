@@ -24,7 +24,6 @@ class Scene():
         self.sprites= Group(objects)
         self.obsctacles = obstacles
         self.collisions=CollisionCalculator(self.sprites, obstacles)
-        # self.renderer= ObstaclesRenderer(obstacles)
     
     def render_scene(self, screen:Surface, clock: Clock, dt: float):
         screen.fill((255, 255, 255))
@@ -72,15 +71,21 @@ class Scene():
         self.obsctacles.append(obstacle)
 
         self.collisions = CollisionCalculator(self.sprites, self.obsctacles)
+
+    def restart(self):
+        return load_scene(self.name)
     
     def save_scene(self):
         objects = []
         for object in self.objects:
             obj_data= asdict(object.config)
+            obj_data["name"] = object.name
             obj_data["type"] = object.type
             obj_data["start_pos"]=(object.pos.x, object.pos.y)
             obj_data["start_velocity"]=(object.velocity.x, object.velocity.y)
             obj_data["collider_type"]=object.collider.type
+            obj_data["start_angle"]=object.angle
+            obj_data["start_angular_velocity"]=object.angular_velocity
             if object.type == "Pendulum":
                 obj_data["suspension_point"]=(object.suspension_point.x, object.suspension_point.y)
             objects.append(obj_data)
@@ -113,13 +118,15 @@ def load_scene(name):
         config = ObjectConfig(**{k: v for k, v in object.items() if k in ObjectConfig.__dataclass_fields__})
         start_pos=Vector(object["start_pos"][0] , object["start_pos"][1])
         start_velocity=Vector(object["start_velocity"][0], object["start_velocity"][1])
+        start_angle=object["start_angle"]
+        start_angular_velocity=object["start_angular_velocity"]
         collider_type = object["collider_type"]
             
         if object["type"] == "Pendulum":
             suspension_point=Vector(object["suspension_point"][0], object["suspension_point"][1])
             objects_list.append(Pendulum(config, start_pos, start_velocity, collider_type, suspension_point, object["name"]))
         else:
-            objects_list.append(PhysicalObject(config, start_pos, start_velocity, collider_type, object["name"]))
+            objects_list.append(PhysicalObject(config, start_pos, start_velocity, start_angle, start_angular_velocity, collider_type, object["name"]))
     for obstacle in scene_json["obstacles"]:
         obstacle_instance=Obstacle(obstacle["x0"],obstacle["x1"],obstacle["y0"],obstacle["y1"])
         obstacles_list.append(obstacle_instance)
@@ -133,34 +140,38 @@ screen_borders = [
     Obstacle(WIDTH, WIDTH+100, 0, HEIGHT),
 ]
 box_cfg = ObjectConfig(
-    "box",
      corners = [
-    Vector(-137, -22),
-    Vector(-53, -119),
-    Vector(84, -103),
-    Vector(161, 17),
-    Vector(72, 148),
-    Vector(-91, 126),
-],
+        (-150, -20),
+        (150, -20),
+        (150, 20),
+        (-150, 20),
+    ],
     stiffnes_cf=1000,
     density=1,
-    friction_cf=0.2,
+    friction_cf=0.1,
     restitution=0.2,
     gravity=True,
     draw_trajectory=False
 )
 rubber_ball = ObjectConfig(
-    "rubber_ball",
     radius=25,
     stiffnes_cf=1000,
     density=1,
-    friction_cf=0.2,
-    restitution=0.8,
+    friction_cf=0.1,
+    restitution=0.4,
     gravity=True,
-    draw_trajectory=True
+    draw_trajectory=False
+)
+rubber_ball1 = ObjectConfig(
+    radius=50,
+    stiffnes_cf=1000,
+    density=1,
+    friction_cf=0.1,
+    restitution=0.4,
+    gravity=True,
+    draw_trajectory=False
 )
 rubber_ball_pendulum = ObjectConfig(
-    name = "rubber_ball_pendulum",
     density=1,
     radius=50,
     gravity=True,
@@ -176,7 +187,13 @@ rubber_ball_pendulum = ObjectConfig(
     pendulum_friction= False
 )
 
-polygon = PhysicalObject(box_cfg, start_pos=Vector(300,120), start_velocity=Vector(0,0), start_angular_velocity=0, collider_type="Polygon", name="Box1")
-ball= PhysicalObject(rubber_ball, start_pos=Vector(270,300), start_velocity=Vector(0,0), collider_type="Circle", name="Ball1")
+polygon = PhysicalObject(box_cfg, start_pos=Vector(400,25+50), start_velocity=Vector(0,0), start_angular_velocity=0, collider_type="Polygon", name="Box1")
+ball= PhysicalObject(rubber_ball, start_pos=Vector(450,25), start_velocity=Vector(0,0), collider_type="Circle", name="Ball1")
+ball1= PhysicalObject(rubber_ball, start_pos=Vector(350,25), start_velocity=Vector(0,0), collider_type="Circle", name="Ball2")
+ball2= PhysicalObject(rubber_ball1, start_pos=Vector(450,25+50+70), start_velocity=Vector(-100,0), collider_type="Circle", name="Ball3")
 
-scene = Scene([polygon, ball], obstacles=screen_borders, name="rotating box")
+scene = Scene([polygon, ball, ball1, ball2], obstacles=screen_borders, name="ball on cart")
+scene.save_scene()
+
+
+scene = load_scene("ball on cart")

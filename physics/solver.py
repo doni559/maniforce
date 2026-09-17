@@ -110,6 +110,8 @@ class CollisionCalculator():
                     contact_velocity = target_sprite.velocity+dot_rotational_velocity
                     radial_velocity : Vector = normal * (contact_velocity.scalar_multiply(normal))
 
+                    tangential_velocity = contact_velocity-radial_velocity
+
                     restitution=target_sprite.restitution
                     if restitution == 0:
                         restitution=EPS
@@ -120,7 +122,7 @@ class CollisionCalculator():
                     contact_force=spring_force+damping_force
                     
                     #friction force
-                    friction_force = contact_velocity.normalise()*(-1) * target_sprite.friction_cf * contact_force.get_length()
+                    friction_force = tangential_velocity.normalise()*(-1) * target_sprite.friction_cf * contact_force.get_length()
 
                     collision_force=contact_force+friction_force
                     collision_torque = torque_leverarm.vector_multiply(collision_force)

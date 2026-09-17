@@ -11,8 +11,6 @@ from settings import SUBSTEPS, GRAV_CONST
 
 @dataclass(frozen=True)
 class ObjectConfig():
-    name: str
-
     gravity: bool
     draw_trajectory: bool
     stiffnes_cf : float
@@ -23,7 +21,7 @@ class ObjectConfig():
     radius : float | None = None
     width: float | None = None
     height : float | None = None
-    corners: List[Vector] | None = None
+    corners: List[Tuple[float]] | None = None
 
 
     rope_stiffness_cf : float | None = None
@@ -81,8 +79,10 @@ class PhysicalObject(sprite.Sprite):
             total_moment_of_inertia=0
             center_mass=Vector(0,0)
             for index in range(0, len(config.corners)):
-                point = config.corners[index]
-                next_point = config.corners[(index+1) % len(config.corners)]
+                corners = [Vector(corner[0], corner[1]) for corner in config.corners]
+                point = corners[index]
+
+                next_point = corners[(index+1) % len(corners)]
     
                 sector_volume = abs(point.vector_multiply(next_point))/2 * self.calibrating_length
                 total_volume+= sector_volume
@@ -215,10 +215,10 @@ class Obstacle():
         self.height = y1-y0
 
         self.collider= Collider("Polygon", center= self.center, corners =[
-            Vector(-self.width/2, -self.height/2),
-            Vector(+self.width/2, -self.height/2),
-            Vector(+self.width/2, +self.height/2),
-            Vector(-self.width/2, +self.height/2),
+            (-self.width/2, -self.height/2),
+            (+self.width/2, -self.height/2),
+            (+self.width/2, +self.height/2),
+            (-self.width/2, +self.height/2),
         ])
 
         self.fill=True

@@ -14,7 +14,7 @@ class UX():
         screen.blit(self.font.render(text, True, color, bg), position)
         
     def display_fps(self, screen : Surface, clock: Clock):
-        self.draw_text(f"{str(int(clock.get_fps()))} FPS", (10,10), (0,0,0), (255,255,255), screen)
+        self.draw_text(f"{str(int(clock.get_fps()))} FPS", ( 10,10), (0,0,0), (255,255,255), screen)
 
 def main():  
     init()
@@ -27,21 +27,26 @@ def main():
     clock = time.Clock()
     ux= UX(50)
 
+    loaded_scene = scene
 
     while run:
         if not pause:
             dt= min(0.1, clock.get_time()/1000)
-            scene.render_scene(screen, clock, dt)
+            loaded_scene.render_scene(screen, clock, dt)
             ux.display_fps(screen, clock)
             display.flip()
-            clock.tick(FPS)
-
+        clock.tick(FPS)
         for e in event.get():
             if e.type == KEYDOWN:
                 if e.key == K_ESCAPE:   
                     run=False
                 if e.key == K_SPACE: 
                     pause = not pause
+                if e.key == K_F5:
+                    loaded_scene.save_scene()
+                if e.key == K_F9:
+                    loaded_scene=loaded_scene.restart()
+
             if e.type == QUIT:
                 run = False
     quit()

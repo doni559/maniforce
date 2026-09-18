@@ -1,6 +1,8 @@
 from math import sqrt, sin, cos
 from pygame import draw
 
+from typing import Tuple
+
 from settings import HEIGHT
 
 class Vector():
@@ -26,6 +28,8 @@ class Vector():
     def rotate(self, angle):
         return Vector(self.x*cos(angle) - self.y*sin(angle), self.x*sin(angle) + self.y*cos(angle))
 
+    def as_tuple(self) -> Tuple[float, float]:
+        return (self.x, self.y)
 
     def __add__(self, other):
         if isinstance(other, Vector):

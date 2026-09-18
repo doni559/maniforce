@@ -1,8 +1,8 @@
 from pygame import sprite
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import List, Tuple
-from math import radians, pi
+from math import radians, degrees, pi
 
 from .collider import Collider
 
@@ -21,8 +21,6 @@ class ObjectConfig():
     radius : float | None = None
     width: float | None = None
     height : float | None = None
-    corners: List[Tuple[float]] | None = None
-
 
     rope_stiffness_cf : float | None = None
     rope_dampfing_cf : float | None = None
@@ -32,54 +30,76 @@ class ObjectConfig():
     is_rope_breakable : bool | None = None
     pendulum_friction : bool | None = None
 
+@dataclass(frozen=True)
+class PhysicalObjectInitFields():
+    name : str = "Object0"
+    config: ObjectConfig | None = None
+    collider_type : str = "Polygon"
+
+    corners: List[Vector] | None = None
+    start_pos: Vector | None = None
+    start_velocity: Vector | None = None
+
+    start_angle: float | None = None
+    start_angular_velocity: float | None = None
 
 
+
+# config: ObjectConfig, start_pos = Vector(0,0), start_velocity= Vector(0,0), start_angle=0, start_angular_velocity=0, collider_type="Circle" , name="Object0"
 class PhysicalObject(sprite.Sprite):
-    def __init__(self, config: ObjectConfig, start_pos = Vector(0,0), start_velocity= Vector(0,0), start_angle=0, start_angular_velocity=0, collider_type="Circle" , name="Object0"):
+    def __init__(self, init_fields : PhysicalObjectInitFields | None = None, **kwargs ):
+        if not init_fields:
+            init_fields=PhysicalObjectInitFields(**kwargs)
         sprite.Sprite.__init__(self)
         self.type="PhysicalObject"
-        self.name = name
-        self.config= config
+        self.name = init_fields.name
+        self.config= init_fields.config
+        self.relative_corners = init_fields.corners
         
-        self.velocity = start_velocity
+        self.velocity = init_fields.start_velocity
         self.acceleration = Vector(0,0)
-        self.pos = start_pos
+        self.pos = init_fields.start_pos
 
-        self.angle = radians(start_angle)
-        self.angular_velocity=radians(start_angular_velocity)
+        self.angle=0
+        self.angular_velocity=0
+        try:
+            self.angle = radians(init_fields.start_angle)
+            self.angular_velocity=radians(init_fields.start_angular_velocity)
+        except:
+            pass
         self.angular_acceleration=0
 
         self.resultant_force = Vector(0,0)
         self.resultant_torque = 0
 
-        self.stiffness_cf = config.stiffnes_cf
-        self.friction_cf=config.friction_cf
-        self.restitution=config.restitution
+        self.stiffness_cf = self.config.stiffnes_cf
+        self.friction_cf= self.config.friction_cf
+        self.restitution= self.config.restitution
 
         #Other things
         self.trajectory_arr = [Vector(self.pos.x, self.pos.y)]
     
         #Constants
-        self.density =config.density
+        self.density =self.config.density
         self.calibrating_length=10**-6
                 
         ##System Flags
-        self.gravity=config.gravity
-        self.draw_trajectory=config.draw_trajectory
+        self.gravity=self.config.gravity
+        self.draw_trajectory=self.config.draw_trajectory
 
-        if collider_type == "Circle":
-            self.collider = Collider(collider_type,center=start_pos, radius=config.radius)
-            self.radius = config.radius
+        if init_fields.collider_type == "Circle":
+            self.collider = Collider(init_fields.collider_type,center=self.pos, radius=self.config.radius)
+            self.radius = self.config.radius
             self.volume = self.radius**3 * pi * 4/3 /4187666
             self.mass=self.density*self.volume
             self.moment_of_inertia=1/2*self.mass*self.radius**2
     
-        if collider_type in ("Box", "Polygon"):
+        if init_fields.collider_type in ("Box", "Polygon"):
             total_volume = 0
             total_moment_of_inertia=0
             center_mass=Vector(0,0)
-            for index in range(0, len(config.corners)):
-                corners = [Vector(corner[0], corner[1]) for corner in config.corners]
+            for index in range(0, len(self.relative_corners)):
+                corners=self.relative_corners
                 point = corners[index]
 
                 next_point = corners[(index+1) % len(corners)]
@@ -107,11 +127,20 @@ class PhysicalObject(sprite.Sprite):
 
             #steiner theorem
             self.moment_of_inertia=total_moment_of_inertia - self.mass* center_mass.get_length()**2
-            self.collider = Collider(collider_type,
+            self.collider = Collider(init_fields.collider_type,
                         center=self.pos,
-                        corners = config.corners)
-            origin_offset=start_pos-self.pos
+                        corners = init_fields.corners)
+            origin_offset= init_fields.start_pos-self.pos
             self.origin_offset_local = origin_offset.rotate(-self.angle)
+
+    def get_fields(self) -> PhysicalObjectInitFields:
+        if self.type in ["Polygon, Box"]:
+            start_pos=self.pos+self.origin_offset_local.rotate(self.angle)
+        else:
+            start_pos=Vector(self.pos.x, self.pos.y)
+        fields = PhysicalObjectInitFields()
+        fields.__dict__.update(**self.__dict__, corners = self.relative_corners, start_pos = start_pos, start_velocity=self.velocity, start_angle=degrees(self.angle), start_angular_velocity=degrees(self.angular_velocity))
+        return fields
 
     def calc_position(self, dt):
         self.acceleration = self.resultant_force / self.mass
@@ -215,10 +244,10 @@ class Obstacle():
         self.height = y1-y0
 
         self.collider= Collider("Polygon", center= self.center, corners =[
-            (-self.width/2, -self.height/2),
-            (+self.width/2, -self.height/2),
-            (+self.width/2, +self.height/2),
-            (-self.width/2, +self.height/2),
+            Vector(-self.width/2, -self.height/2),
+            Vector(+self.width/2, -self.height/2),
+            Vector(+self.width/2, +self.height/2),
+            Vector(-self.width/2, +self.height/2),
         ])
 
         self.fill=True

@@ -26,7 +26,6 @@ def main():
     screen = display.get_surface()
     clock = time.Clock()
     ux= UX(50)
-
     loaded_scene = scene
 
     while run:

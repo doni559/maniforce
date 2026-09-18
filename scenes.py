@@ -3,7 +3,7 @@ from pygame.sprite import Group
 from pygame.time import Clock
 
 from physics.utils import Vector
-from physics.bodies import PhysicalObject, Obstacle, Pendulum, ObjectConfig, PhysicalObjectInitFields
+from physics.bodies import PhysicalObject, Obstacle, ObjectConfig, PhysicalObjectInitFields
 from physics.solver import CollisionCalculator
 
 from settings import WIDTH, HEIGHT, SUBSTEPS
@@ -33,12 +33,6 @@ class Scene():
             self.collisions.calculate_collisions_penalty()
 
         for sprite in self.sprites.sprites():
-            if isinstance(sprite, Pendulum) and sprite.rope_exists:
-                sprite : Pendulum= sprite
-                draw.line(screen, (255, 0, 0), (sprite.suspension_point.x, HEIGHT-sprite.suspension_point.y), (sprite.pos.x, HEIGHT-sprite.pos.y), 3)
-            else:
-                sprite : PhysicalObject = sprite
-
             sprite : PhysicalObject = sprite
             sprite.collider.draw(screen, (0,255,0), (sprite.pos.x, HEIGHT-sprite.pos.y))
             sprite.velocity.draw(screen, sprite.pos, (0,0,255))
@@ -87,7 +81,8 @@ class Scene():
             for key, value in obj_data.items():
                 if isinstance(value, Vector):
                     obj_data[key]=value.as_tuple()
-            obj_data["corners"]=[corner.as_tuple() for corner in obj_data["corners"]]
+            if obj_data["corners"] is not None:
+                obj_data["corners"]=[corner.as_tuple() for corner in obj_data["corners"]]
             objects.append(obj_data)
         obstacles_data=[]
         for obstacle in self.obsctacles:
@@ -117,7 +112,8 @@ def load_scene(name):
         object : dict= object
 
         object["config"] = ObjectConfig(**object["config"])
-        object["corners"]=[Vector(corner[0], corner[1]) for corner in object["corners"]]
+        if object["corners"] is not None:
+            object["corners"]=[Vector(corner[0], corner[1]) for corner in object["corners"]]
         object["start_pos"]=Vector(object["start_pos"][0], object["start_pos"][1])
         object["start_velocity"]=Vector(object["start_velocity"][0], object["start_velocity"][1])
 
@@ -148,43 +144,19 @@ polygon_cfg = ObjectConfig(
 box_cfg = ObjectConfig(
     stiffnes_cf=1000,
     density=1,
-    friction_cf=0.3,
-    restitution=0.4,
+    friction_cf=0.2,
+    restitution=0.2,
     gravity=True,
     draw_trajectory=False
 )
 rubber_ball = ObjectConfig(
-    radius=25,
+
     stiffnes_cf=1000,
     density=1,
-    friction_cf=0.1,
-    restitution=0.4,
+    friction_cf=0.4,
+    restitution=0.9,
     gravity=True,
     draw_trajectory=False
-)
-rubber_ball1 = ObjectConfig(
-    radius=50,
-    stiffnes_cf=1000,
-    density=1,
-    friction_cf=0.1,
-    restitution=0.4,
-    gravity=True,
-    draw_trajectory=False
-)
-rubber_ball_pendulum = ObjectConfig(
-    density=1,
-    radius=50,
-    gravity=True,
-    draw_trajectory=False,
-    rope_stiffness_cf=2000,
-    restitution=1,
-    stiffnes_cf=1000,
-    friction_cf=0,
-    rope_dampfing_cf=200,
-    rope_force_limit=100000,
-    rope_exists=True,
-    is_rope_breakable=True,
-    pendulum_friction= False
 )
 
 polygon = PhysicalObject(init_fields=None, config=polygon_cfg,
@@ -202,10 +174,10 @@ box = PhysicalObject(init_fields=None, config= polygon_cfg,corners =
         Vector(100, 50),
         Vector(-100, 50),
     ], start_pos=Vector(0,0), start_velocity=Vector(0,0), start_angle=90, collider_type="Polygon", name="Box0")
-ball= PhysicalObject(init_fields=None, config=rubber_ball, start_pos=Vector(0,0), start_velocity=Vector(0,0), collider_type="Circle", name="Ball0")
+ball= PhysicalObject(init_fields=None, config=rubber_ball,    radius=25, start_pos=Vector(0,0), start_velocity=Vector(0,0), collider_type="Circle", name="Ball0")
 
 scene = Scene([], obstacles=screen_borders, name="test")
-scene.add_object(box, name="Box0", start_pos=Vector(500,500), start_angle = 45)
+scene.add_object(ball, name="Ball0",    radius=75, start_pos=Vector(500,500), start_angle = 45, start_angular_velocity=-360)
 scene.save_scene()
 
 scene = load_scene("test")

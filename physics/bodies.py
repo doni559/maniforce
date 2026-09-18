@@ -18,7 +18,6 @@ class ObjectConfig():
     restitution : float
     density: float
 
-    radius : float | None = None
     width: float | None = None
     height : float | None = None
 
@@ -36,6 +35,7 @@ class PhysicalObjectInitFields():
     config: ObjectConfig | None = None
     collider_type : str = "Polygon"
 
+    radius : float | None = None
     corners: List[Vector] | None = None
     start_pos: Vector | None = None
     start_velocity: Vector | None = None
@@ -48,12 +48,15 @@ class PhysicalObjectInitFields():
 # config: ObjectConfig, start_pos = Vector(0,0), start_velocity= Vector(0,0), start_angle=0, start_angular_velocity=0, collider_type="Circle" , name="Object0"
 class PhysicalObject(sprite.Sprite):
     def __init__(self, init_fields : PhysicalObjectInitFields | None = None, **kwargs ):
+        sprite.Sprite.__init__(self)
         if not init_fields:
             init_fields=PhysicalObjectInitFields(**kwargs)
-        sprite.Sprite.__init__(self)
+
+
         self.type="PhysicalObject"
         self.name = init_fields.name
         self.config= init_fields.config
+        self.collider_type=init_fields.collider_type
         self.relative_corners = init_fields.corners
         
         self.velocity = init_fields.start_velocity
@@ -81,18 +84,18 @@ class PhysicalObject(sprite.Sprite):
     
         #Constants
         self.density =self.config.density
-        self.calibrating_length=10**-6
+        self.calibrating_length=200**(-1)
                 
         ##System Flags
         self.gravity=self.config.gravity
         self.draw_trajectory=self.config.draw_trajectory
 
         if init_fields.collider_type == "Circle":
-            self.collider = Collider(init_fields.collider_type,center=self.pos, radius=self.config.radius)
-            self.radius = self.config.radius
-            self.volume = self.radius**3 * pi * 4/3 /4187666
+            self.collider = Collider(init_fields.collider_type,center=self.pos, radius=init_fields.radius)
+            self.radius = init_fields.radius
+            self.volume = (init_fields.radius*self.calibrating_length)**3 * pi * 4/3 
             self.mass=self.density*self.volume
-            self.moment_of_inertia=1/2*self.mass*self.radius**2
+            self.moment_of_inertia=1/2*self.mass*(init_fields.radius)**2
     
         if init_fields.collider_type in ("Box", "Polygon"):
             total_volume = 0
@@ -104,7 +107,7 @@ class PhysicalObject(sprite.Sprite):
 
                 next_point = corners[(index+1) % len(corners)]
     
-                sector_volume = abs(point.vector_multiply(next_point))/2 * self.calibrating_length
+                sector_volume = abs(point.vector_multiply(next_point))/2 * self.calibrating_length**2
                 total_volume+= sector_volume
     
                 sector_center = (next_point+point) * (1/3)
@@ -121,12 +124,12 @@ class PhysicalObject(sprite.Sprite):
             
             self.volume = total_volume
             self.mass = self.volume*self.density
-
             center_mass /= self.mass
             self.pos += center_mass.rotate(self.angle)
 
             #steiner theorem
-            self.moment_of_inertia=total_moment_of_inertia - self.mass* center_mass.get_length()**2
+            self.moment_of_inertia=(total_moment_of_inertia- self.mass* center_mass.get_length()**2)
+            
             self.collider = Collider(init_fields.collider_type,
                         center=self.pos,
                         corners = init_fields.corners)
@@ -134,7 +137,7 @@ class PhysicalObject(sprite.Sprite):
             self.origin_offset_local = origin_offset.rotate(-self.angle)
 
     def get_fields(self) -> PhysicalObjectInitFields:
-        if self.type in ["Polygon, Box"]:
+        if self.collider_type in ["Polygon, Box"]:
             start_pos=self.pos+self.origin_offset_local.rotate(self.angle)
         else:
             start_pos=Vector(self.pos.x, self.pos.y)
@@ -179,58 +182,6 @@ class PhysicalObject(sprite.Sprite):
     def update(self, dt):
         self.calc_forces()
         self.calc_position(dt/SUBSTEPS)
-
-
-        
-#WILL BE REMOVED
-class Pendulum(PhysicalObject):
-    def __init__(self, config : ObjectConfig, start_pos = Vector(0,0), start_velocity= Vector(0,0), start_angle =0,collider_type="Circle", suspension_point = Vector(0,0), name= "Pendulum0"):
-        super().__init__(config, start_pos, start_velocity, start_angle,collider_type, name)
-        self.type = "Pendulum"
-        #Other things
-        self.elongation=0
-
-        #Constants
-        self.rope_stiffness_cf= config.rope_stiffness_cf
-        self.rope_dampfing_cf = config.rope_dampfing_cf
-        self.rope_force_limit=config.rope_force_limit
-        self.rope_length=150
-        self.suspension_point=Vector(start_pos.x, start_pos.y+self.rope_length)
-
-
-        ##System Flags
-        self.rope_exists= config.rope_exists
-        self.is_rope_breakable=config.is_rope_breakable
-        self.pendulum_friction=config.pendulum_friction
-
-    def calc_forces(self):
-        super().calc_forces()
-        radius_vector = Vector(self.pos.x-self.suspension_point.x, self.pos.y-self.suspension_point.y)
-        radius = radius_vector.get_length()
-        if self.rope_exists:
-            self.elongation=self.rope_length-radius
-
-            rope_friction_force = Vector(0,0)
-            rope_stiffness_force : Vector = radius_vector.normalise() * self.rope_stiffness_cf * self.elongation
-            try:
-                radial_velocity = radius_vector.scalar_multiply(self.velocity)/radius
-            except ZeroDivisionError:
-                radial_velocity =0
-            if self.pendulum_friction:
-                rope_friction_force : Vector = radius_vector.normalise() * self.rope_dampfing_cf * radial_velocity * -1
-            rope_force = rope_stiffness_force + rope_friction_force
-            
-            if rope_force.scalar_multiply(radius_vector) > 0 or radius < self.rope_length:
-                rope_force*=0
-            if rope_force.get_length() > self.rope_force_limit and self.is_rope_breakable: 
-                self.rope_exists = False
-            self.forces.append(rope_force)   
-    def update(self, dt):
-        super().update(dt)
-
-
-
-
 
 class Obstacle():
     def __init__(self, x0,x1, y0,y1):

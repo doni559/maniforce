@@ -3,7 +3,7 @@ from pygame import draw
 
 from typing import Tuple
 
-from settings import HEIGHT
+from settings import HEIGHT, EPS
 
 class Vector():
     def __init__(self, x, y):
@@ -31,6 +31,17 @@ class Vector():
     def as_tuple(self) -> Tuple[float, float]:
         return (self.x, self.y)
 
+    def convert_to_screen_cords(self):
+        return Vector(self.x, HEIGHT-self.y).as_tuple()
+
+    def draw(self, screen, start_pos, color):
+        start_pos : Vector = start_pos
+        end_pos : Vector = (start_pos+self).convert_to_screen_cords()
+        start_pos = start_pos.convert_to_screen_cords()
+
+        draw.line(screen, color=color, start_pos=start_pos, end_pos=end_pos, width=4)
+    
+
     def __add__(self, other):
         if isinstance(other, Vector):
             return Vector(self.x + other.x, self.y + other.y)
@@ -54,13 +65,14 @@ class Vector():
             return Vector(self.x / other, self.y / other)
     
         return NotImplemented
+
+    def __neg__(self):
+        return Vector(-self.x, -self.y)
     
     def __str__(self):
         return f"Vector({self.x}, {self.y})"
 
-    def draw(self, screen, start_pos, color):
-        draw.line(screen, color=color, start_pos=(start_pos.x, HEIGHT-start_pos.y), end_pos=(start_pos.x+self.x, HEIGHT-(start_pos.y+self.y)), width=4)
-
+    
 def clamp(x, left, right) -> float:
     return max(left, min(x, right))
 

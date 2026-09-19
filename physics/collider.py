@@ -26,15 +26,15 @@ class Collider():
         
     def draw(self, screen, color, center : Tuple[int] | None = None):
         if (self.type == "Circle"):
-            draw.circle(screen, color,center, radius=self.radius)
+            draw.circle(screen, color, center, radius=self.radius)
         if (self.type == "Box" or self.type == "Polygon"):
-            draw.polygon(screen,color, [(point.x, HEIGHT-point.y) for point in self.corners])
+            draw.polygon(screen,color, [point.convert_to_screen_cords() for point in self.corners])
 
-    def calculate_deformation(self, another_collider, object , another_object_pos) -> Tuple[Vector, List[dict]]:
+    def calculate_deformation(self, another_collider, object_pos , another_object_pos) -> Tuple[Vector, List[dict]]:
         another_collider : Collider = another_collider
         if (self.type == "Circle" and another_collider.type == "Circle"):
             collision_distance = sum([self.radius, another_collider.radius])
-            distance : Vector= (another_object_pos - object.pos)
+            distance : Vector= (another_object_pos - object_pos)
             deformation= collision_distance-distance.get_length()
             normal = distance.normalise()
             if distance.scalar_multiply(normal) >0:
@@ -42,7 +42,7 @@ class Collider():
             contact_points=[]
             if deformation > 0:
                 contact_points.append({
-                    "pos":object.pos-normal*self.radius,
+                    "pos":object_pos-normal*self.radius,
                     "deformation":deformation
                 })
             return normal, contact_points
@@ -60,7 +60,7 @@ class Collider():
                 normal = Vector(side.y, -side.x).normalise()
                 normals.append(normal)
             for i in range(0, len(another_collider.corners)):
-                normal= (another_collider.corners[i]-object.pos).normalise()
+                normal= (another_collider.corners[i]-object_pos).normalise()
                 normals.append(normal)
             
             #projecting objects on normals and writing intervals
@@ -89,13 +89,13 @@ class Collider():
             index=penetrations.index(deformation)
             normal = Vector(normals[index].x, normals[index].y)
             contact_points=[]
-            distance : Vector = another_object_pos - object.pos
+            distance : Vector = another_object_pos - object_pos
             if distance.scalar_multiply(normal) > 0:
                 normal*=-1
             if deformation > 0:
                 contact_points.append(
                     {
-                        "pos":object.pos-normal*self.radius,
+                        "pos":object_pos-normal*self.radius,
                         "deformation":deformation
                     }
                 )
@@ -144,7 +144,7 @@ class Collider():
 
             normal = Vector(normals[index].x, normals[index].y)
             contact_points=[]
-            distance : Vector = another_object_pos- object.pos
+            distance : Vector = another_object_pos- object_pos
             if distance.scalar_multiply(normal) > 0:
                 normal*=-1
             if deformation > 0:
@@ -212,7 +212,7 @@ class Collider():
             index=penetrations.index(deformation)
             normal = Vector(normals[index].x, normals[index].y)
             
-            distance : Vector = another_object_pos - object.pos
+            distance : Vector = another_object_pos - object_pos
             if index in range(0 , len(another_collider.corners)):
                 reference_index = index
                 reference = another_collider

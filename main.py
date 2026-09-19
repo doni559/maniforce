@@ -1,7 +1,7 @@
 from pygame import *
 from pygame.time import Clock
 
-from scenes import scene
+from scenes_manager import scene
 from settings import HEIGHT, WIDTH, FPS
 
 from typing import Tuple
@@ -31,7 +31,7 @@ def main():
     while run:
         if not pause:
             dt= min(0.1, clock.get_time()/1000)
-            loaded_scene.render_scene(screen, clock, dt)
+            loaded_scene.render_scene(screen, dt)
             ux.display_fps(screen, clock)
             display.flip()
         clock.tick(FPS)

@@ -18,16 +18,6 @@ class ObjectConfig():
     restitution : float
     density: float
 
-    width: float | None = None
-    height : float | None = None
-
-    rope_stiffness_cf : float | None = None
-    rope_dampfing_cf : float | None = None
-    rope_force_limit : float | None = None
-
-    rope_exists : bool | None = None
-    is_rope_breakable : bool | None = None
-    pendulum_friction : bool | None = None
 
 @dataclass(frozen=True)
 class PhysicalObjectInitFields():
@@ -84,7 +74,7 @@ class PhysicalObject(sprite.Sprite):
     
         #Constants
         self.density =self.config.density
-        self.calibrating_length=200**(-1)
+        self.calibrating_length=10**(-6)
                 
         ##System Flags
         self.gravity=self.config.gravity
@@ -93,7 +83,7 @@ class PhysicalObject(sprite.Sprite):
         if init_fields.collider_type == "Circle":
             self.collider = Collider(init_fields.collider_type,center=self.pos, radius=init_fields.radius)
             self.radius = init_fields.radius
-            self.volume = (init_fields.radius*self.calibrating_length)**3 * pi * 4/3 
+            self.volume = (init_fields.radius)**3 * pi * 4/3 /4600000
             self.mass=self.density*self.volume
             self.moment_of_inertia=1/2*self.mass*(init_fields.radius)**2
     
@@ -107,7 +97,7 @@ class PhysicalObject(sprite.Sprite):
 
                 next_point = corners[(index+1) % len(corners)]
     
-                sector_volume = abs(point.vector_multiply(next_point))/2 * self.calibrating_length**2
+                sector_volume = abs(point.vector_multiply(next_point))/2 * self.calibrating_length
                 total_volume+= sector_volume
     
                 sector_center = (next_point+point) * (1/3)
@@ -137,7 +127,7 @@ class PhysicalObject(sprite.Sprite):
             self.origin_offset_local = origin_offset.rotate(-self.angle)
 
     def get_fields(self) -> PhysicalObjectInitFields:
-        if self.collider_type in ["Polygon, Box"]:
+        if self.collider_type in ["Polygon","Box"]:
             start_pos=self.pos+self.origin_offset_local.rotate(self.angle)
         else:
             start_pos=Vector(self.pos.x, self.pos.y)

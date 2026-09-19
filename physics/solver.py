@@ -4,17 +4,20 @@ from typing import List
 from math import sqrt, log, e as euler, pi
 
 from .bodies import PhysicalObject, Obstacle
+from .connections import Joint, JointNode
 
 from .utils import Vector
 from settings import EPS
 
 class CollisionCalculator():
-    def __init__(self, all_sprites : sprite.Group, all_obstacles: List[Obstacle]):
+    def __init__(self, all_sprites : sprite.Group, all_obstacles: List[Obstacle], all_joints: List[Joint]):
         self.colliders = all_obstacles
         self.sprites= all_sprites.sprites()
+        self.joints = all_joints
 
     def calculate_collisions_penalty(self):
         sprites: List[PhysicalObject]=self.sprites
+        joint: List[Joint] = self.joints
         resulting_forces={}
         resulting_torques={}
 
@@ -36,7 +39,7 @@ class CollisionCalculator():
                     resulting_torques[j]=0
                 another_sprite : PhysicalObject =sprites[j]
                 
-                normal, contact_points = target_sprite.collider.calculate_deformation(another_sprite.collider, target_sprite, another_sprite.pos)
+                normal, contact_points = target_sprite.collider.calculate_deformation(another_sprite.collider, target_sprite.pos, another_sprite.pos)
 
                 for contact_point in contact_points:
                     position=contact_point["pos"]
@@ -96,7 +99,7 @@ class CollisionCalculator():
 
             for k in range(0, len(self.colliders)):
                 collider = self.colliders[k]
-                normal, contact_points = target_sprite.collider.calculate_deformation(collider.collider, target_sprite, collider.center)
+                normal, contact_points = target_sprite.collider.calculate_deformation(collider.collider, target_sprite.pos, collider.center)
                 for contact_point in contact_points:
                     position=contact_point["pos"]
                     deformation=contact_point["deformation"]
@@ -135,3 +138,47 @@ class CollisionCalculator():
             sprites[key].resultant_force+=value
         for key, value in resulting_torques.items():
             sprites[key].resultant_torque+=value
+
+        joint_resulting_forces = {}
+
+        for i in range (0, len(self.joints)):
+            joint : Joint=self.joints[i]
+            joint_resulting_forces[i]={}
+            for j in range(0, len(joint.endpoints)):
+                endpoint= joint.endpoints[j]
+                if isinstance(endpoint, JointNode):
+                    joint_resulting_forces[i][j]=Vector(0,0)
+                    for k in range(0, len(self.colliders)):
+                        collider = self.colliders[k]
+                        normal, contact_points = endpoint.collider.calculate_deformation(collider.collider, endpoint.pos, collider.center)
+                        for contact_point in contact_points:
+                            position=contact_point["pos"]
+                            deformation=contact_point["deformation"]
+                            stiffnes_cf=10
+                            spring_force : Vector= normal * stiffnes_cf * abs(deformation)
+                            
+                            contact_velocity = endpoint.velocity
+                            radial_velocity : Vector = normal * (contact_velocity.scalar_multiply(normal))
+
+                            tangential_velocity = contact_velocity-radial_velocity
+
+                            restitution=0.2
+                            damping_ratio = - log(restitution)/ (sqrt(pi**2 + (log(restitution))**2 ))
+                            damping_cf= 2*damping_ratio*sqrt(stiffnes_cf*endpoint.mass)
+                            damping_force : Vector = radial_velocity.normalise()*(-1) * damping_cf * radial_velocity.get_length()
+
+                            contact_force=spring_force+damping_force
+
+                            #friction force
+                            friction_force = tangential_velocity.normalise()*(-1) * endpoint.friction_cf * contact_force.get_length()
+
+                            collision_force=contact_force+friction_force
+
+                            joint_resulting_forces[i][j]+=collision_force
+        for key, value in joint_resulting_forces.items():
+            joint = self.joints[key]
+            for k,v  in joint_resulting_forces[key].items():
+                node : JointNode =joint.endpoints[k]
+                node.resultant_force+=v
+            
+                

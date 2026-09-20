@@ -7,6 +7,15 @@ The project focuses on implementing the underlying physics systems manually rath
 
 *The engine is primarily an educational and experimental project and is still under active development.*
 
+## Install Guide
+0) Download Python 3.13+
+
+1) Copy or download git-repo to any folder on your PC
+2) In cmd write: "pip -m venv ./venv"
+3) Then: pip install -r requirements.txt
+4) Run from main.py
+
+
 ## Features
 
 Currently implemented features include:

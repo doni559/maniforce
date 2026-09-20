@@ -1,11 +1,10 @@
 from pygame import *
 from pygame.sprite import Group
-from pygame.time import Clock
 
 from physics.utils import Vector
 from physics.bodies import PhysicalObject, Obstacle, ObjectConfig, PhysicalObjectInitFields
 from physics.solver import CollisionCalculator
-from physics.connections import Joint
+from physics.connections import Joint, JointInitFields
 
 from settings import WIDTH, HEIGHT, SUBSTEPS
 
@@ -15,7 +14,7 @@ from pathlib import Path
 import json
 from dataclasses import asdict
 
-
+from materials import ball, box, polygon, rope
 
 class Scene():
     def __init__(self, objects: List[PhysicalObject], obstacles: List[Obstacle], name:str, joints : List[Joint] = []):
@@ -102,7 +101,9 @@ class Scene():
     
     def save_scene(self):
         objects = []
+        object_names=[]
         for object in self.objects:
+            object_names.append(object.name)
             obj_data = asdict(object.get_fields())
             for key, value in obj_data.items():
                 if isinstance(value, Vector):
@@ -120,9 +121,26 @@ class Scene():
                     "y1":obstacle.y1
                 }
             )
+        joints_data=[]
+        for joint in self.joints:
+            anchor0_name=joint.anchor_0.name
+            anchor1_name=None
+            if isinstance(joint.anchor_1, PhysicalObject):
+                anchor1_name=joint.anchor_1.name
+
+            if (object_names.count(anchor0_name) > 1 or object_names.count(anchor1_name) > 1):
+                raise ValueError("Objects names are not unique")
+            joint_data= asdict(joint.get_fields())
+            joint_data["anchor_0"]=anchor0_name
+            if anchor1_name is not None:
+                joint_data["anchor_1"]=anchor1_name
+            else:
+                joint_data["anchor_1"]=joint_data["anchor_1"].as_tuple()
+            joints_data.append(joint_data)
         data={
             "obstacles":obstacles_data,
-            "objects":objects
+            "objects":objects,
+            "joints": joints_data
         }
         path= Path("./scenes/"+self.name+".json")
         with open(path, "w") as f:
@@ -132,6 +150,7 @@ def load_scene(name):
     path_to_scene="./scenes/"+name+".json"
     objects_list : List[PhysicalObject] =[]
     obstacles_list : List[Obstacle] =[]
+    joints_list : List[Joint] = []
     with open(path_to_scene, "r") as f:
         scene_json=json.load(f)
     for object in scene_json["objects"]:
@@ -149,7 +168,25 @@ def load_scene(name):
     for obstacle in scene_json["obstacles"]:
         obstacle_instance=Obstacle(obstacle["x0"],obstacle["x1"],obstacle["y0"],obstacle["y1"])
         obstacles_list.append(obstacle_instance)
-    scene = Scene(objects_list, obstacles_list, name=name)
+    for joint in scene_json["joints"]:
+        joint:dict = joint
+        anchor_0_name=joint["anchor_0"]
+        anchor_1_name=None
+        if isinstance(joint["anchor_1"], str):
+            anchor_1_name=joint["anchor_1"]
+        else:
+            anchor_1=Vector(joint["anchor_1"][0],joint["anchor_1"][1])
+        for obj in objects_list:
+            if anchor_0_name == obj.name:
+                anchor_0=obj
+            if (anchor_1_name is not None) and anchor_1_name == obj.name:
+                anchor_1=obj
+        joint["anchor_0"]=anchor_0
+        joint["anchor_1"]=anchor_1
+        init_fields = JointInitFields(**joint)
+        joint_instance = Joint(init_fields)
+        joints_list.append(joint_instance)
+    scene = Scene(objects_list, obstacles_list, name=name, joints=joints_list)
     return scene
 
 screen_borders = [
@@ -159,89 +196,6 @@ screen_borders = [
     Obstacle(WIDTH, WIDTH+100, 0, HEIGHT),
 ]
 
-polygon_cfg = ObjectConfig(
-    stiffnes_cf=1000,
-    density=1,
-    friction_cf=0.3,
-    restitution=0.4,
-    gravity=True,
-    draw_trajectory=False
-)
-box_cfg = ObjectConfig(
-    stiffnes_cf=250,
-    density=1,
-    friction_cf=0.2,
-    restitution=0.2,
-    gravity=True,
-    draw_trajectory=False
-)
-rubber_ball = ObjectConfig(
-
-    stiffnes_cf=1000,
-    density=1,
-    friction_cf=0.6,
-    restitution=0.2,
-    gravity=True,
-    draw_trajectory=False
-)
-
-polygon = PhysicalObject(init_fields=None, config=polygon_cfg,
-    corners = 
-    [
-        Vector(-150, -20),
-        Vector(150, -20),
-        Vector(150, 20),
-        Vector(-300, 20),
-    ], start_pos=Vector(0,0), start_velocity=Vector(0,0), start_angle=90, collider_type="Polygon", name="Polygon0")
-box = PhysicalObject(init_fields=None, config= box_cfg,corners = 
-    [
-        Vector(-50, -50),
-        Vector(100, -50),
-        Vector(100, 50),
-        Vector(-50, 50),
-    ], start_pos=Vector(0,0), start_velocity=Vector(0,0), start_angle=90, collider_type="Polygon", name="Box0")
-ball= PhysicalObject(init_fields=None, config=rubber_ball,    radius=25, start_pos=Vector(0,0), start_velocity=Vector(0,0), collider_type="Circle", name="Ball0")
-rope = Joint(anchor_0 = ball, anchor_1=Vector(ball.pos.x+100, ball.pos.y+100), stiffness_cf =50, nodes_count= 5, joint_mass=0.2, damping_cf=1, friction_cf = 0.001)
-
-scene_to_load = "pendulum_test"
+scene_to_load = "pendulum_cart_test"
 scene = Scene([], obstacles=screen_borders, name=scene_to_load)
-
-# wall=Obstacle(100,200,0,500)
-# wall1=Obstacle(800,900,0,500)
-# scene.add_obstacle(wall)
-# scene.add_obstacle(wall1)
-ball1=scene.add_object(ball, name="Ball0",    radius=25, start_pos=Vector(270,345), start_velocity=Vector(100,0), start_angle = 0, start_angular_velocity=0)
-
-scene.add_object(ball, start_pos = Vector(150, 25), radius=25)
-scene.add_object(ball, start_pos = Vector(350, 25), radius=25)
-scene.add_object(box, corners=[
-    Vector(-200, -25),
-    Vector(200, -25),
-    Vector(200, 25),
-    Vector(-200, 25)
-], start_pos = Vector(250, 100), start_angle=0)
-box1=scene.add_object(box, corners=[
-    Vector(-200, -25),
-    Vector(200, -25),
-    Vector(200, 25),
-    Vector(-200, 25)
-], start_pos = Vector(250, 455), start_angle=0)
-
-scene.add_object(box, corners=[
-    Vector(-150, -25),
-    Vector(150, -25),
-    Vector(150, 25),
-    Vector(-150, 25)
-], start_pos = Vector(100, 275), start_angle=90)
-scene.add_object(box, corners=[
-    Vector(-150, -25),
-    Vector(150, -25),
-    Vector(150, 25),
-    Vector(-150, 25)
-], start_pos = Vector(350, 275), start_angle=90)
-
-# ball1=scene.add_object(ball, name="Ball1",    radius=25, start_pos=Vector(600,25), start_velocity=Vector(1000,0), start_angle = 0, start_angular_velocity=-1000)
-rope=scene.add_joint(rope, anchor_0 = ball1, anchor_1=box1, stiffness_cf = 100, force_limit = 5000)
-# scene.save_scene()
-
-# scene = load_scene(scene_to_load)
+scene = load_scene(scene_to_load)

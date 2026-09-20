@@ -42,10 +42,10 @@ polygon = PhysicalObject(init_fields=None, config=polygon_cfg,
 box = PhysicalObject(init_fields=None, config= box_cfg,corners = 
     [
         Vector(-50, -50),
-        Vector(100, -50),
-        Vector(100, 50),
+        Vector(50, -50),
+        Vector(50, 50),
         Vector(-50, 50),
     ], start_pos=Vector(0,0), start_velocity=Vector(0,0), start_angle=90, collider_type="Polygon", name="Box0")
 ball= PhysicalObject(init_fields=None, config=rubber_ball,    radius=25, start_pos=Vector(0,0), start_velocity=Vector(0,0), collider_type="Circle", name="Ball0")
-rope = Joint(anchor_0 = ball, anchor_1=Vector(ball.pos.x+100, ball.pos.y+100), stiffness_cf =50, nodes_count= 5, joint_mass=0.2, damping_cf=1, friction_cf = 0.001)
+rope = Joint(anchor_0 = ball, anchor_1=Vector(ball.pos.x+100, ball.pos.y+100), stiffness_cf =100, nodes_count= 10, joint_mass=0.2, damping_cf=1, friction_cf = 0.001)
 

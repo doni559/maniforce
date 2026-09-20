@@ -7,16 +7,9 @@ The project focuses on implementing the underlying physics systems manually rath
 
 *The engine is primarily an educational and experimental project and is still under active development.*
 
-## Install Guide
-0) Download Python 3.13+
-
-1) Copy or download git-repo to any folder on your PC
-2) In cmd write: "pip -m venv ./venv"
-3) Then: pip install -r requirements.txt
-4) Run from main.py
-
-
 ## Features
+
+![ManiForce demo](assets/maniforce_demo.gif)
 
 Currently implemented features include:
 
@@ -168,6 +161,16 @@ This makes it possible to construct systems such as:
 The joint system is still experimental and is expected to gain additional behaviour and collision support in future versions.
 
 ---
+
+### Installation Guide
+0) Download Python 3.13+
+
+1) Copy or download git-repo to any folder on your PC
+2) In cmd write: "pip -m venv ./venv"
+3) Then: pip install -r requirements.txt
+4) Run from main.py
+
+---
 ## Work in Progress (WIP)
 
 ManiForce is currently in active development.
@@ -262,7 +265,7 @@ Planned features and experiments:
 The focus of this version is not additional visible features, but making existing systems more stable and predictable.
 
 ---
-# To be continued...
+## To be continued...
 > More deatiled plan for versions until 1.0.0 may appear in future.   
 
 `1.0.0` will mark the point where the core architecture is considered stable enough that major breaking changes should become significantly less frequent.

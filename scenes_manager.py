@@ -196,6 +196,5 @@ screen_borders = [
     Obstacle(WIDTH, WIDTH+100, 0, HEIGHT),
 ]
 
-scene_to_load = "pendulum_cart_test"
+scene_to_load = ""
 scene = Scene([], obstacles=screen_borders, name=scene_to_load)
-scene = load_scene(scene_to_load)

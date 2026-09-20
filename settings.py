@@ -6,7 +6,7 @@ FPS=250
 SUBSTEPS=5
 #Display dimensions
 WIDTH=1900
-HEIGHT=900
+HEIGHT=1000
 #Gravitational constant
 GRAV_CONST=981
 #Epsilon. Technical constant that has influence on special collision situations. 

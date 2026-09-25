@@ -1,9 +1,9 @@
 from math import sqrt, sin, cos
 from pygame import draw
 
-from typing import Tuple
+from typing import Tuple, List
 
-from settings import HEIGHT, EPS
+from configs.settings import HEIGHT, EPS
 
 class Vector():
     def __init__(self, x, y):
@@ -31,16 +31,20 @@ class Vector():
     def as_tuple(self) -> Tuple[float, float]:
         return (self.x, self.y)
 
-    def convert_to_screen_cords(self):
-        return Vector(self.x, HEIGHT-self.y).as_tuple()
+    def convert_to_screen_cords(self, camera_pos: List[float], camera_zoom:float):
+        result_vector=Vector(self.x-camera_pos[0], HEIGHT+camera_pos[1]-self.y)
+        result_vector*=camera_zoom
+        return result_vector.as_tuple()
 
-    def draw(self, screen, start_pos, color):
+    def draw(self, screen, start_pos, color, camera_pos: List[float], camera_zoom:float, width = 4):
         start_pos : Vector = start_pos
-        end_pos : Vector = (start_pos+self).convert_to_screen_cords()
-        start_pos = start_pos.convert_to_screen_cords()
+        end_pos : Vector = (start_pos+self).convert_to_screen_cords(camera_pos, camera_zoom)
+        start_pos = start_pos.convert_to_screen_cords(camera_pos, camera_zoom)
 
-        draw.line(screen, color=color, start_pos=start_pos, end_pos=end_pos, width=4)
-    
+        draw.line(screen, color=color, start_pos=start_pos, end_pos=end_pos, width=int(width*camera_zoom))
+
+    def __repr__(self):
+        return f"Vector({self.x}, {self.y})"
 
     def __add__(self, other):
         if isinstance(other, Vector):
@@ -55,7 +59,14 @@ class Vector():
     def __mul__(self, other):
         if isinstance(other, (int, float)):
             return Vector(self.x * other, self.y * other)
-
+        if isinstance(other, Vector):
+            return self.scalar_multiply(other)
+        return NotImplemented
+    def __rmul__(self, other):
+        if isinstance(other, (int, float)):
+            return Vector(self.x*other, self.y*other)
+        if isinstance(other, Vector):
+            return self.scalar_multiply(other)
         return NotImplemented
 
     def __truediv__(self, other):
@@ -68,6 +79,17 @@ class Vector():
 
     def __neg__(self):
         return Vector(-self.x, -self.y)
+
+    def __eq__(self, value):
+        if not isinstance(value, Vector):
+            return NotImplemented
+        value : Vector = value
+        if self.x == value.x and self.y == value.y:
+            return True
+        return False
+
+    
+
     
     def __str__(self):
         return f"Vector({self.x}, {self.y})"

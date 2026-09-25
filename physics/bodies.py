@@ -7,7 +7,7 @@ from math import radians, degrees, pi
 from .collider import Collider
 
 from .utils import Vector
-from settings import SUBSTEPS, GRAV_CONST
+from configs.settings import SUBSTEPS, GRAV_CONST
 
 @dataclass(frozen=True)
 class ObjectConfig():
@@ -125,6 +125,8 @@ class PhysicalObject(sprite.Sprite):
                         corners = init_fields.corners)
             origin_offset= init_fields.start_pos-self.pos
             self.origin_offset_local = origin_offset.rotate(-self.angle)
+            self.pos= init_fields.start_pos
+
 
     def get_fields(self) -> PhysicalObjectInitFields:
         if self.collider_type in ["Polygon","Box"]:
@@ -149,26 +151,24 @@ class PhysicalObject(sprite.Sprite):
             self.angle = self.angle - (self.angle//(2*pi)) *2*pi
 
         if (self.collider.type in ("Box", "Polygon")):
-            #changing coordinates from origin to center of mass
-            offset = self.origin_offset_local
-            relative_coords : List[Vector] = [coord + offset for coord in self.collider.relative_corners ]
-            #rotating on angle
-            rotated_coords = [coord.rotate(self.angle) for coord in relative_coords]
-            #changing back to origin
-            new_corners= [ 
-                self.pos + rotated_coords[i] for i in range(0, len(rotated_coords))
-            ]
-            self.collider.corners=new_corners
+            self.collider.get_world_corners(self)
         self.collider.center=self.pos 
-
-        self.resultant_force=Vector(0,0)
-        self.resultant_torque=0
+        self.clear_forces()
     
     def calc_forces(self):
         if self.gravity:
             gravity_force = Vector(0, -GRAV_CONST * self.mass)
             self.resultant_force+=gravity_force
 
+    def apply_force(self, force : Vector, contact_point: Vector | None = None):
+        self.resultant_force+=force
+        if contact_point is not None:
+            lever_arm= contact_point- self.pos
+            self.resultant_torque+=lever_arm.vector_multiply(force)
+    def clear_forces(self):
+        self.resultant_force=Vector(0,0)
+        self.resultant_torque=0
+    
     def update(self, dt):
         self.calc_forces()
         self.calc_position(dt/SUBSTEPS)

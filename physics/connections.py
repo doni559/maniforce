@@ -2,7 +2,7 @@ from .bodies import PhysicalObject
 from .utils import Vector
 from .collider import Collider
 
-from settings import GRAV_CONST
+from configs.settings import GRAV_CONST
 
 from dataclasses import dataclass, field
 from typing import List
@@ -31,7 +31,7 @@ class BodyAnchor(JointEndpoint):
         return self.object.velocity
 
     def apply_force(self, force):
-        self.object.resultant_force+= force
+        self.object.apply_force(force)
 
 @dataclass
 class WorldAnchor(JointEndpoint):
@@ -94,12 +94,6 @@ class JointSector():
     force_limit: float
 
     to_destroy : bool = False
-
-    def draw(self, screen: Surface):
-        start_pos = self.node_a.get_pos().convert_to_screen_cords()
-        end_pos = self.node_b.get_pos().convert_to_screen_cords()
-
-        draw.line(screen, color=(0,0,0), start_pos=start_pos, end_pos=end_pos, width=2)
 
     def calculate(self):
 
@@ -211,9 +205,13 @@ class Joint():
     def destroy_joint(self):
         self.to_destroy=True
 
-    def draw_joint(self, screen: Surface):
+    def draw_joint(self, screen: Surface, camera_pos : List[float], camera_zoom: float):
         for sector in self.sectors:
-            sector.draw(screen)
+            start_point = sector.node_a.get_pos()
+            end_point = sector.node_b.get_pos()
+
+            vector : Vector= end_point-start_point
+            vector.draw(screen, start_point, color=(0,0,0), camera_pos=camera_pos, camera_zoom=camera_zoom, width=4)
 
     
 

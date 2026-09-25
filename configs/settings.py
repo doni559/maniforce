@@ -5,8 +5,8 @@ FPS=250
 # Higher values may cause FPS slowdown, but physics will be more stable especcialy on high speeds 
 SUBSTEPS=5
 #Display dimensions
-WIDTH=1900
-HEIGHT=1000
+WIDTH=1000
+HEIGHT=800
 #Gravitational constant
 GRAV_CONST=981
 #Epsilon. Technical constant that has influence on special collision situations. 

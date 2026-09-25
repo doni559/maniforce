@@ -3,7 +3,8 @@ from pygame import draw
 from typing import Tuple, List
 
 from .utils import Vector
-from settings import HEIGHT, EPS
+from configs.settings import HEIGHT, EPS
+from pytest import approx
 
 class Collider():
     def __init__(self, collider_type : str , center : Vector,**kwargs):
@@ -23,12 +24,27 @@ class Collider():
             self.relative_corners = kwargs["corners"]
             world_corners = [Vector(center.x+point.x, center.y+point.y) for point in self.relative_corners]
             self.corners = world_corners
+
+    def get_world_corners(self, object):
+        if self.type != "Polygon":
+            raise ValueError("Only Polygon type has variable corners")
+        #changing coordinates from origin to center of mass
+        offset = object.origin_offset_local
+        relative_coords : List[Vector] = [coord + offset for coord in object.collider.relative_corners ]
+        #rotating on angle
+        rotated_coords = [coord.rotate(object.angle) for coord in relative_coords]
+        #changing back to origin
+        new_corners= [ 
+            object.pos + rotated_coords[i] for i in range(0, len(rotated_coords))
+        ]
+        self.corners=new_corners
+        return new_corners
         
-    def draw(self, screen, color, center : Tuple[int] | None = None):
+    def draw(self, screen, color, center : Tuple[int] | None = None, camera_pos: List[float] = [0,0], camera_zoom: float = 1):
         if (self.type == "Circle"):
-            draw.circle(screen, color, center, radius=self.radius)
+            draw.circle(screen, color, center, radius=self.radius*camera_zoom)
         if (self.type == "Box" or self.type == "Polygon"):
-            draw.polygon(screen,color, [point.convert_to_screen_cords() for point in self.corners])
+            draw.polygon(screen,color, [point.convert_to_screen_cords(camera_pos, camera_zoom) for point in self.corners])
 
     def calculate_deformation(self, another_collider, object_pos , another_object_pos) -> Tuple[Vector, List[dict]]:
         another_collider : Collider = another_collider
@@ -39,13 +55,17 @@ class Collider():
             normal = distance.normalise()
             if distance.scalar_multiply(normal) >0:
                 normal*= -1
+            
             contact_points=[]
-            if deformation > 0:
+            if deformation > 0 and deformation != approx(0):
                 contact_points.append({
                     "pos":object_pos-normal*self.radius,
                     "deformation":deformation
                 })
-            return normal, contact_points
+                return normal, contact_points
+            
+            return Vector(0,0), contact_points
+
         if (self.type == "Circle" and another_collider.type in ["Polygon", "Box"]):
             normals : List[Vector]=[]
             penetrations : List[float] = []
@@ -92,14 +112,16 @@ class Collider():
             distance : Vector = another_object_pos - object_pos
             if distance.scalar_multiply(normal) > 0:
                 normal*=-1
-            if deformation > 0:
+            if deformation > 0 and deformation != approx(0):
                 contact_points.append(
                     {
                         "pos":object_pos-normal*self.radius,
                         "deformation":deformation
                     }
                 )
-            return normal, contact_points
+                return normal, contact_points
+            return Vector(0,0), []
+        
         if (self.type in ["Box", "Polygon"] and another_collider.type == "Circle"):
             normals : List[Vector]=[]
             penetrations : List[float] = []
@@ -146,15 +168,17 @@ class Collider():
             contact_points=[]
             distance : Vector = another_object_pos- object_pos
             if distance.scalar_multiply(normal) > 0:
-                normal*=-1
-            if deformation > 0:
+                normal *= -1
+            if deformation > 0 and deformation != approx(0):
                 contact_points.append(
                     {
-                        "pos":another_object_pos+normal*another_collider.radius,
+                        "pos":another_object_pos+normal*(another_collider.radius-deformation),
                         "deformation":deformation
                     }
-                )       
-            return normal, contact_points
+                )
+                return normal, contact_points
+            return Vector(0,0), []
+            
 
         if (self.type in ["Box", "Polygon"] and another_collider.type in ["Box", "Polygon"]):
             #SAT
@@ -294,17 +318,18 @@ class Collider():
             deformation_p0 = -(clipped_p0-reference_p0).scalar_multiply(normal)
             deformation_p1 = -(clipped_p1-reference_p0).scalar_multiply(normal)
             contact_points =[]
-            if deformation_p0 >= 0:
+            if distance.scalar_multiply(normal) > 0:
+                normal *= -1
+            if deformation_p0 > 0 and deformation_p0 != approx(0):
                 contact_points.append({
                     "pos": clipped_p0,
                     "deformation":deformation_p0
                 })
-            if deformation_p1 >= 0:
-                
+            if deformation_p1 > 0 and deformation_p1 != approx(0):
                 contact_points.append({
                     "pos": clipped_p1,
                     "deformation":deformation_p1
                 })
-            if distance.scalar_multiply(normal) > 0:
-                normal *= -1
+            if len(contact_points) == 0:
+                return Vector(0,0), []
             return normal, contact_points

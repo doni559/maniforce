@@ -4,7 +4,6 @@ from typing import Tuple, List
 
 from .utils import Vector
 from configs.settings import HEIGHT, EPS
-
 class Collider():
     def __init__(self, collider_type : str , center : Vector,**kwargs):
         possible_types = [
@@ -322,12 +321,12 @@ class Collider():
             contact_points =[]
             if distance.scalar_multiply(normal) > 0:
                 normal *= -1
-            if deformation_p0 > 0 and not self.is_effectively_zero(deformation):
+            if deformation_p0 > EPS and not self.is_effectively_zero(deformation):
                 contact_points.append({
                     "pos": clipped_p0,
                     "deformation":max(0,deformation_p0)
                 })
-            if deformation_p1 > 0 > EPS and not self.is_effectively_zero(deformation):
+            if deformation_p1 > EPS  and not self.is_effectively_zero(deformation):
                 contact_points.append({
                     "pos": clipped_p1,
                     "deformation":max(0,deformation_p1)

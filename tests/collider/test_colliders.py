@@ -107,26 +107,43 @@ def test_collision(bodies):
     collision_2_manifold, _collision_2_manifold = get_contact_manifolds(Vector(1, 0), [Vector(49, 649)], [Vector(50, 649)], [1])
 
     assert collision_0[0] == collision_0_manifold[0]
+    assert len(collision_0[1]) == len(collision_0_manifold[1])
     for actual in collision_0[1]:
-        assert any(expected == actual for expected in collision_0_manifold[1])
+        assert any([actual == exp for exp in collision_0_manifold[1]])
+        i = collision_0_manifold[1].index(actual)
+        collision_0_manifold[1].pop(i)
 
     assert _collision_0[0] == _collision_0_manifold[0]
+    assert len(_collision_0[1]) == len(_collision_0_manifold[1])
     for actual in _collision_0[1]:
-        assert any(expected == actual for expected in _collision_0_manifold[1])
+        assert any([actual == exp for exp in _collision_0_manifold[1]])
+        i = _collision_0_manifold[1].index(actual)
+        _collision_0_manifold[1].pop(i)
 
     assert collision_1[0] == collision_1_manifold[0]
+    assert len(collision_1[1]) == len(collision_1_manifold[1])
     for actual in collision_1[1]:
-        assert any(expected == actual for expected in collision_1_manifold[1])
+        assert any([actual == exp for exp in collision_1_manifold[1]])
+        i = collision_1_manifold[1].index(actual)
+        collision_1_manifold[1].pop(i)
 
     assert _collision_1[0] == _collision_1_manifold[0]
+    assert len(_collision_1[1]) == len(_collision_1_manifold[1])
     for actual in _collision_1[1]:
-        assert any(expected == actual for expected in _collision_1_manifold[1])
-    print(_collision_2_manifold, _collision_2)
+        assert any([actual == exp for exp in _collision_1_manifold[1]])
+        i = _collision_1_manifold[1].index(actual)
+        _collision_1_manifold[1].pop(i)
 
     assert collision_2[0] == collision_2_manifold[0]
+    assert len(collision_2[1]) == len(collision_2_manifold[1])
     for actual in collision_2[1]:
-        assert any(expected == actual for expected in collision_2_manifold[1])
+        assert any([actual == exp for exp in collision_2_manifold[1]])
+        i = collision_2_manifold[1].index(actual)
+        collision_2_manifold[1].pop(i)
 
     assert _collision_2[0] == _collision_2_manifold[0]
+    assert len(_collision_2[1]) == len(_collision_2_manifold[1])
     for actual in _collision_2[1]:
-        assert any(expected == actual for expected in _collision_2_manifold[1])
+        assert any([actual == exp for exp in _collision_2_manifold[1]])
+        i = _collision_2_manifold[1].index(actual)
+        _collision_2_manifold[1].pop(i)

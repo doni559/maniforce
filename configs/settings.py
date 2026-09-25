@@ -10,4 +10,4 @@ HEIGHT=800
 #Gravitational constant
 GRAV_CONST=981
 #Epsilon. Technical constant that has influence on special collision situations. 
-EPS=0.001
+EPS=10**(-9)

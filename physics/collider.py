@@ -4,7 +4,6 @@ from typing import Tuple, List
 
 from .utils import Vector
 from configs.settings import HEIGHT, EPS
-from pytest import approx
 
 class Collider():
     def __init__(self, collider_type : str , center : Vector,**kwargs):
@@ -46,6 +45,9 @@ class Collider():
         if (self.type == "Box" or self.type == "Polygon"):
             draw.polygon(screen,color, [point.convert_to_screen_cords(camera_pos, camera_zoom) for point in self.corners])
 
+    def is_effectively_zero(self, number: float):
+        return abs(number) <= EPS
+
     def calculate_deformation(self, another_collider, object_pos , another_object_pos) -> Tuple[Vector, List[dict]]:
         another_collider : Collider = another_collider
         if (self.type == "Circle" and another_collider.type == "Circle"):
@@ -57,10 +59,10 @@ class Collider():
                 normal*= -1
             
             contact_points=[]
-            if deformation > 0 and deformation != approx(0):
+            if deformation > 0 and not self.is_effectively_zero(deformation):
                 contact_points.append({
                     "pos":object_pos-normal*self.radius,
-                    "deformation":deformation
+                    "deformation":max(0,deformation)
                 })
                 return normal, contact_points
             
@@ -112,11 +114,11 @@ class Collider():
             distance : Vector = another_object_pos - object_pos
             if distance.scalar_multiply(normal) > 0:
                 normal*=-1
-            if deformation > 0 and deformation != approx(0):
+            if deformation > 0 and not self.is_effectively_zero(deformation):
                 contact_points.append(
                     {
                         "pos":object_pos-normal*self.radius,
-                        "deformation":deformation
+                        "deformation":max(0,deformation)
                     }
                 )
                 return normal, contact_points
@@ -169,11 +171,11 @@ class Collider():
             distance : Vector = another_object_pos- object_pos
             if distance.scalar_multiply(normal) > 0:
                 normal *= -1
-            if deformation > 0 and deformation != approx(0):
+            if deformation > 0 and not self.is_effectively_zero(deformation):
                 contact_points.append(
                     {
                         "pos":another_object_pos+normal*(another_collider.radius-deformation),
-                        "deformation":deformation
+                        "deformation":max(0,deformation)
                     }
                 )
                 return normal, contact_points
@@ -320,15 +322,15 @@ class Collider():
             contact_points =[]
             if distance.scalar_multiply(normal) > 0:
                 normal *= -1
-            if deformation_p0 > 0 and deformation_p0 != approx(0):
+            if deformation_p0 > 0 and not self.is_effectively_zero(deformation):
                 contact_points.append({
                     "pos": clipped_p0,
-                    "deformation":deformation_p0
+                    "deformation":max(0,deformation_p0)
                 })
-            if deformation_p1 > 0 and deformation_p1 != approx(0):
+            if deformation_p1 > 0 > EPS and not self.is_effectively_zero(deformation):
                 contact_points.append({
                     "pos": clipped_p1,
-                    "deformation":deformation_p1
+                    "deformation":max(0,deformation_p1)
                 })
             if len(contact_points) == 0:
                 return Vector(0,0), []

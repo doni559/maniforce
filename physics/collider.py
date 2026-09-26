@@ -60,7 +60,7 @@ class Collider():
             contact_points=[]
             if deformation > 0 and not self.is_effectively_zero(deformation):
                 contact_points.append({
-                    "pos":object_pos-normal*self.radius,
+                    "pos":object_pos-normal*(self.radius-deformation/2),
                     "deformation":max(0,deformation)
                 })
                 return normal, contact_points
@@ -116,7 +116,7 @@ class Collider():
             if deformation > 0 and not self.is_effectively_zero(deformation):
                 contact_points.append(
                     {
-                        "pos":object_pos-normal*self.radius,
+                        "pos":object_pos-normal*(self.radius-deformation/2),
                         "deformation":max(0,deformation)
                     }
                 )
@@ -173,7 +173,7 @@ class Collider():
             if deformation > 0 and not self.is_effectively_zero(deformation):
                 contact_points.append(
                     {
-                        "pos":another_object_pos+normal*(another_collider.radius-deformation),
+                        "pos":another_object_pos+normal*(another_collider.radius-deformation/2),
                         "deformation":max(0,deformation)
                     }
                 )
@@ -323,12 +323,12 @@ class Collider():
                 normal *= -1
             if deformation_p0 > EPS and not self.is_effectively_zero(deformation):
                 contact_points.append({
-                    "pos": clipped_p0,
+                    "pos": clipped_p0+normal*(deformation/2),
                     "deformation":max(0,deformation_p0)
                 })
             if deformation_p1 > EPS  and not self.is_effectively_zero(deformation):
                 contact_points.append({
-                    "pos": clipped_p1,
+                    "pos": clipped_p1+normal*(deformation/2),
                     "deformation":max(0,deformation_p1)
                 })
             if len(contact_points) == 0:

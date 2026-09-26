@@ -164,6 +164,8 @@ class PhysicalObject(sprite.Sprite):
         self.resultant_force+=force
         if contact_point is not None:
             lever_arm= contact_point- self.pos
+            print(self.name, lever_arm, force)
+            print(lever_arm.vector_multiply(force))
             self.resultant_torque+=lever_arm.vector_multiply(force)
     def clear_forces(self):
         self.resultant_force=Vector(0,0)

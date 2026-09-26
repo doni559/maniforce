@@ -66,7 +66,6 @@ class CollisionCalculator():
 
                         #cf must be evaluated due to material data. materials WYP so it will be changed later
                         common_friction_cf = sqrt(target.friction_cf*another.friction_cf)
-
                         friction_force = tangential_velocity.normalise() *(-1) * common_friction_cf * contact_force.get_length()
                         collision_force = contact_force+friction_force
 

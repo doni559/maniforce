@@ -1,9 +1,40 @@
-from ..bodies import rectangular_body, circle_body
 from physics.bodies import PhysicalObject
 from physics.utils import Vector
+from . import box_cfg, rubber_ball
 
 import pytest
 from typing import List
+
+@pytest.fixture
+def rectangular_body() -> PhysicalObject:
+    return PhysicalObject(
+        config=box_cfg,
+        corners = [
+            Vector(-100, -50),
+            Vector(100, -50),
+            Vector(100, 50),
+            Vector(-100, 50)
+        ],
+        start_pos = Vector(100, 500),
+        start_velocity = Vector(100, -500),
+        start_angle=90,
+        start_angular_velocity = -90,
+        collider_type="Polygon",
+        name = "Rectangle0"
+    )
+
+@pytest.fixture
+def circle_body() -> PhysicalObject:
+    return PhysicalObject(
+        name = "Circle0",
+        config = rubber_ball,
+        collider_type = "Circle",
+        radius = 50,
+        start_pos = Vector(100,-500),
+        start_velocity= Vector(-500, 100),
+        start_angle = 90,
+        start_angular_velocity=-90
+    )
 
 @pytest.fixture
 def bodies(rectangular_body, circle_body):
@@ -17,7 +48,6 @@ def bodies(rectangular_body, circle_body):
     rect_1.update(0)
     circle_0.update(0)
     circle_1.update(0)
-
 
     return rect_0, rect_1, circle_0, circle_1
 
@@ -84,14 +114,12 @@ def test_edge_collision(bodies):
 
     collision_0, collision_1, collision_2, _collision_0, _collision_1, _collision_2 = do_collisions(rect_0, rect_1, circle_0, circle_1)
 
-
     assert collision_0 == _collision_0 == none_set
     assert collision_1 == _collision_1 == none_set
     assert collision_2 == _collision_2 == none_set
 
 def test_collision(bodies):
     rect_0, rect_1, circle_0, circle_1 = bodies
-    none_set = (Vector(0,0), [])
 
     rect_0.pos=Vector(0, 500)
     rect_1.pos=Vector(99,500)
@@ -102,9 +130,9 @@ def test_collision(bodies):
 
     collision_0, collision_1, collision_2, _collision_0, _collision_1, _collision_2 = do_collisions(rect_0, rect_1, circle_0, circle_1)
 
-    collision_0_manifold, _collision_0_manifold = get_contact_manifolds(Vector(-1, 0), [Vector(50, 600), Vector(50, 400)], [Vector(49,400), Vector(49, 600)], [1, 1])
-    collision_1_manifold, _collision_1_manifold = get_contact_manifolds(Vector(0, -1), [Vector(0, 600)], [Vector(0, 599)], [1])
-    collision_2_manifold, _collision_2_manifold = get_contact_manifolds(Vector(1, 0), [Vector(49, 649)], [Vector(50, 649)], [1])
+    collision_0_manifold, _collision_0_manifold = get_contact_manifolds(Vector(-1, 0), [Vector(49.5, 600), Vector(49.5, 400)], [Vector(49.5,400), Vector(49.5, 600)], [1, 1])
+    collision_1_manifold, _collision_1_manifold = get_contact_manifolds(Vector(0, -1), [Vector(0, 599.5)], [Vector(0, 599.5)], [1])
+    collision_2_manifold, _collision_2_manifold = get_contact_manifolds(Vector(1, 0), [Vector(49.5, 649)], [Vector(49.5, 649)], [1])
 
     assert collision_0[0] == collision_0_manifold[0]
     assert len(collision_0[1]) == len(collision_0_manifold[1])

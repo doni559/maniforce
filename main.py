@@ -1,8 +1,9 @@
 from pygame import *
 from pygame.time import Clock
+from time import perf_counter
 
 from configs.scenes_manager import scene
-from configs.settings import HEIGHT, WIDTH, FPS
+from configs.settings import HEIGHT, WIDTH, FPS, PHYSICS_DT, MAX_FRAME_TIME
 from typing import Tuple
 
 from math import e as euler
@@ -28,7 +29,7 @@ def main():
     
     camera_zooming = 0
     camera_zoom=euler**0
-    zoom_speed=0.005
+    zoom_speed=0.01
 
 
     display.set_mode((WIDTH, HEIGHT))
@@ -37,19 +38,34 @@ def main():
     clock = time.Clock()
     ux= UX(50)
     loaded_scene = scene
+
+    accumulator = 0
+    previous_time = perf_counter()
     
 
     while run:
         if not pause:
-            dt= min(0.1, clock.get_time()/1000)
-            loaded_scene.render_scene(screen, dt, camera_pos, camera_zoom)
-            ux.display_fps(screen, clock)
-            display.flip()
-        clock.tick(FPS)
+            current_time = perf_counter()
+            frame_time = current_time-previous_time
+            # frame_time = min(frame_time, MAX_FRAME_TIME)
+            previous_time = perf_counter()
 
+            accumulator += frame_time
+            while accumulator >= PHYSICS_DT:
+                loaded_scene.step(PHYSICS_DT)
+                accumulator -= PHYSICS_DT
+        if pause:
+            previous_time = perf_counter()
+
+        loaded_scene.render(screen, camera_pos, camera_zoom)
+        ux.display_fps(screen, clock)
+        display.flip()
+
+        clock.tick(FPS)
+        camera_zoom*=euler**camera_zooming
         camera_pos[0]+=camera_moving[0]
         camera_pos[1]+=camera_moving[1]
-        camera_zoom*=euler**camera_zooming
+
         for e in event.get():
             if e.type == KEYDOWN:
                 if e.key == K_ESCAPE:   
@@ -60,15 +76,18 @@ def main():
                     loaded_scene.save_scene()
                 if e.key == K_F9:
                     loaded_scene=loaded_scene.restart()
+                if e.key == K_f:
+                    camera_pos=[0,0]
+                    camera_zoom=1
 
                 if e.key == K_w:
-                    camera_moving[1]+=camera_speed
+                    camera_moving[1]+=camera_speed/camera_zoom
                 if e.key == K_s:
-                    camera_moving[1]-=camera_speed
+                    camera_moving[1]-=camera_speed/camera_zoom
                 if e.key == K_a:
-                    camera_moving[0]-=camera_speed
+                    camera_moving[0]-=camera_speed/camera_zoom
                 if e.key == K_d:
-                    camera_moving[0]+=camera_speed
+                    camera_moving[0]+=camera_speed/camera_zoom
 
                 if e.key == K_z:
                     camera_zooming+= zoom_speed

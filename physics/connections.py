@@ -2,7 +2,7 @@ from .bodies import PhysicalObject
 from .utils import Vector
 from .collider import Collider
 
-from configs.settings import GRAV_CONST
+from configs.settings import GRAV_CONST, SUBSTEPS
 
 from dataclasses import dataclass, field
 from typing import List
@@ -32,6 +32,7 @@ class BodyAnchor(JointEndpoint):
 
     def apply_force(self, force):
         self.object.apply_force(force)
+
 
 @dataclass
 class WorldAnchor(JointEndpoint):
@@ -92,6 +93,7 @@ class JointSector():
     rest_length: float
     damping_cf : float
     force_limit: float
+    elong : float = 0
 
     to_destroy : bool = False
 
@@ -102,6 +104,7 @@ class JointSector():
         normal = delta.normalise()
 
         elong = length-self.rest_length
+        self.elong = elong
 
         spring_force = normal * elong * self.stiffnes_cf
 
@@ -193,11 +196,13 @@ class Joint():
     def get_fields(self):
         return JointInitFields(**{k: v for k, v in self.__dict__.items() if k in JointInitFields.__dataclass_fields__})
 
-    def update(self, dt):
+    def calculate(self):
         for sector in self.sectors:
             sector.calculate()
             if sector.to_destroy == True:
                 self.destroy_joint()
+    
+    def update(self, dt):
         for node in self.endpoints:
             if isinstance(node, JointNode):
                 node.integrate(dt)

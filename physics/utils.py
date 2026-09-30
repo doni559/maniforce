@@ -51,6 +51,11 @@ class Vector():
             return Vector(self.x + other.x, self.y + other.y)
         return NotImplemented
 
+    def __radd__(self, other):
+        if isinstance(other, Vector):
+            return Vector(self.x + other.x, self.y + other.y)
+        return NotImplemented
+
     def __sub__(self, other):
         if isinstance(other, Vector):
             return Vector(self.x - other.x, self.y - other.y)

@@ -137,7 +137,7 @@ class PhysicalObject(sprite.Sprite):
         fields.__dict__.update(**self.__dict__, corners = self.relative_corners, start_pos = start_pos, start_velocity=self.velocity, start_angle=degrees(self.angle), start_angular_velocity=degrees(self.angular_velocity))
         return fields
 
-    def calc_position(self, dt):
+    def integrate(self, dt):
         self.acceleration = self.resultant_force / self.mass
         self.velocity += self.acceleration * dt   
         self.pos += self.velocity*dt
@@ -164,16 +164,13 @@ class PhysicalObject(sprite.Sprite):
         self.resultant_force+=force
         if contact_point is not None:
             lever_arm= contact_point- self.pos
-            print(self.name, lever_arm, force)
-            print(lever_arm.vector_multiply(force))
             self.resultant_torque+=lever_arm.vector_multiply(force)
     def clear_forces(self):
         self.resultant_force=Vector(0,0)
         self.resultant_torque=0
-    
+
     def update(self, dt):
-        self.calc_forces()
-        self.calc_position(dt/SUBSTEPS)
+        self.integrate(dt)
 
 class Obstacle():
     def __init__(self, x0,x1, y0,y1):

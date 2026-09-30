@@ -17,7 +17,7 @@ from dataclasses import asdict
 from configs.materials import ball, box, polygon, rope
 
 class Scene():
-    def __init__(self, load:bool, objects: List[PhysicalObject], obstacles: List[Obstacle], name:str, joints : List[Joint] = []):
+    def __init__(self, load:bool, name:str, objects: List[PhysicalObject]=[], obstacles: List[Obstacle]=[], joints : List[Joint] = [], substeps: int = SUBSTEPS):
         if load == False:
             self.name= name
 
@@ -26,36 +26,50 @@ class Scene():
             self.objects = objects
             self.obstacles = obstacles
             self.joints = joints
+            self.substeps = substeps
 
             self.collisions=CollisionCalculator(self.sprites, self.obstacles, self.joints)
         else:
-            self.__init__(**load_scene(name).get_fields())
-    
-    def render_scene(self, screen:Surface, dt: float, camera_pos: List[float], camera_zoom: float):
-        screen.fill((255, 255, 255))
-        for _ in range(0,SUBSTEPS):
-            self.sprites.update(dt)
+            self.__init__(**load_scene(name, substeps=substeps).get_fields())
+
+    def step(self, dt: float):
+        for _ in range(0,self.substeps):
+            for joint in self.joints:
+                joint.calculate()
+                if joint.to_destroy == True:
+                    self.remove_joint(joint)
+            for sprite in self.sprites:
+                sprite: PhysicalObject = sprite
+                sprite.calc_forces()
             
+            for sprite in self.sprites:
+                sprite: PhysicalObject = sprite
+                sprite.update(dt/self.substeps)
+
+            for joint in self.joints:
+                joint.update(dt/self.substeps)
             self.collisions.calculate_collisions_penalty()
+            
+        
+    
+    def render(self, screen:Surface, camera_pos: List[float], camera_zoom: float):
+        screen.fill((255, 255, 255))
         for joint in self.joints:
-            joint.update(dt)
-            if joint.to_destroy == True:
-                self.remove_joint(joint)
-        for joint in self.joints:
-
             joint.draw_joint(screen, camera_pos, camera_zoom)
-
         for sprite in self.sprites.sprites():
             sprite : PhysicalObject = sprite
+            #Collider draw
             sprite.collider.draw(screen, (0,255,0), sprite.pos.convert_to_screen_cords(camera_pos, camera_zoom), camera_pos, camera_zoom)
+            #Draw origin. TODO: Add system flag
             try:
                 origin_center = sprite.pos + sprite.origin_offset_local.rotate(sprite.angle)
                 draw.circle(screen, (255, 255, 0), origin_center.convert_to_screen_cords(camera_pos, camera_zoom),3*camera_zoom)
             except:
                 pass
+            #Draw COM. TODO: Add system flag
             draw.circle(screen, (255, 0, 255), sprite.pos.convert_to_screen_cords(camera_pos, camera_zoom),3*camera_zoom)
-        
 
+            #Trajectory render
             if sprite.draw_trajectory:
                 for dot_index in range(1,len(sprite.trajectory_arr)):
                     dot=sprite.trajectory_arr[dot_index]
@@ -65,6 +79,7 @@ class Scene():
                 sprite.trajectory_arr.append(Vector(sprite.pos.x, sprite.pos.y))
                 if len(sprite.trajectory_arr) > 1000:
                     sprite.trajectory_arr = sprite.trajectory_arr[-1000:-1]
+        #Obstacles render
         for obstacle in self.obstacles:
             obstacle.collider.draw(screen, (0,0,0), camera_pos=camera_pos, camera_zoom=camera_zoom)
 
@@ -100,9 +115,9 @@ class Scene():
         return new_joint
 
     def restart(self):
-        return load_scene(self.name)
+        return load_scene(self.name, substeps=self.substeps)
     
-    def save_scene(self):
+    def save_scene(self,path: str = "./scenes/"):
         objects = []
         object_names=[]
         for object in self.objects:
@@ -145,7 +160,7 @@ class Scene():
             "objects":objects,
             "joints": joints_data
         }
-        path= Path("./scenes/"+self.name+".json")
+        path= Path(path+self.name+".json")
         with open(path, "w") as f:
             json.dump(data, f, indent=1)
     def get_fields(self):
@@ -157,8 +172,8 @@ class Scene():
             "joints": self.joints   
         }
 
-def load_scene(name):
-    path_to_scene="./scenes/"+name+".json"
+def load_scene(name, path: str = "./scenes/", substeps: int = SUBSTEPS ):
+    path_to_scene=path+name+".json"
     objects_list : List[PhysicalObject] =[]
     obstacles_list : List[Obstacle] =[]
     joints_list : List[Joint] = []
@@ -197,7 +212,7 @@ def load_scene(name):
         init_fields = JointInitFields(**joint)
         joint_instance = Joint(init_fields)
         joints_list.append(joint_instance)
-    scene = Scene(False, objects_list, obstacles_list, name=name, joints=joints_list)
+    scene = Scene(load=False, name=name, objects=objects_list, obstacles=obstacles_list, joints=joints_list, substeps=substeps)
     return scene
 
 screen_borders = [
@@ -208,4 +223,4 @@ screen_borders = [
 ]
 
 scene_to_load = "pendulum_cart_test"
-scene = Scene(True, [], obstacles=screen_borders, name=scene_to_load)
+scene = Scene(load=True, name=scene_to_load, obstacles=screen_borders, substeps=SUBSTEPS)

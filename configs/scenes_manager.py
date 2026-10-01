@@ -17,7 +17,7 @@ from dataclasses import asdict
 from configs.materials import ball, box, polygon, rope
 
 class Scene():
-    def __init__(self, load:bool, name:str, objects: List[PhysicalObject]=[], obstacles: List[Obstacle]=[], joints : List[Joint] = [], substeps: int = SUBSTEPS):
+    def __init__(self, load:bool, name:str, objects: List[PhysicalObject]=None, obstacles: List[Obstacle]=None, joints : List[Joint] = None, substeps: int = SUBSTEPS):
         if load == False:
             self.name= name
 
@@ -33,11 +33,12 @@ class Scene():
             self.__init__(**load_scene(name, substeps=substeps).get_fields())
 
     def step(self, dt: float):
+        joint_to_destroy = []
         for _ in range(0,self.substeps):
             for joint in self.joints:
                 joint.calculate()
                 if joint.to_destroy == True:
-                    self.remove_joint(joint)
+                    joint_to_destroy.append(joint)
             for sprite in self.sprites:
                 sprite: PhysicalObject = sprite
                 sprite.calc_forces()
@@ -49,7 +50,8 @@ class Scene():
             for joint in self.joints:
                 joint.update(dt/self.substeps)
             self.collisions.calculate_collisions_penalty()
-            
+        for joint in joint_to_destroy:
+            self.remove_joint(joint)
         
     
     def render(self, screen:Surface, camera_pos: List[float], camera_zoom: float):

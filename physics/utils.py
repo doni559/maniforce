@@ -44,7 +44,7 @@ class Vector():
         draw.line(screen, color=color, start_pos=start_pos, end_pos=end_pos, width=int(width*camera_zoom))
 
     def __repr__(self):
-        return f"Vector({self.x}, {self.y})"
+        return self.__str__()
 
     def __add__(self, other):
         if isinstance(other, Vector):
@@ -97,7 +97,7 @@ class Vector():
 
     
     def __str__(self):
-        return f"Vector({self.x}, {self.y})"
+        return f"Vector({self.x:.4f}, {self.y:.4f})"
 
     
 def clamp(x, left, right) -> float:

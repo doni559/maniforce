@@ -19,6 +19,7 @@ from time import perf_counter
 
 from rich.table import Table
 from rich.console import Console
+from rich.panel import Panel
 
 
 
@@ -35,6 +36,27 @@ class MetricResult(ABC):
             text_to_display+=f"{key}: {value}\n"
         text_to_display+=f"{"#"*20}\n"
         return text_to_display
+    def __rich__(self):
+        table = Table.grid(padding=(0, 2))
+
+        for key, value in self.__dict__.items():
+            if key == "name":
+                continue
+
+            if isinstance(value, float):
+                value = f"{value:.4f}"
+            if isinstance(value, list):
+                value = [f"{v:.4f}" if isinstance(v, float) else str(v) for v in value]
+                value = ", ".join(value)
+
+            table.add_row(key, str(value))
+
+        return Panel(
+            table,
+            title=f"[bold]{self.name}[/bold]",
+            border_style="cyan"
+            ,width=60
+        )
 
 class Metric(ABC):
     @abstractmethod
@@ -56,6 +78,35 @@ class PerformanceMetricResult(MetricResult):
     avg_step_time: float
     real_time_factor: float
 
+    def __str__(self):
+        text_to_display=""
+        text_to_display+=f"\n{"#"*20}\nMetric: {self.name}\n{"#"*20}\n"
+        text_to_display+=f"real_time: {self.real_time:.4f}s\n"
+        text_to_display+=f"simulated_time: {self.simulated_time:.4f}s\n"
+        text_to_display+=f"total_steps: {self.total_steps}\n"
+        text_to_display+=f"total_substeps: {self.total_substeps}\n"
+        text_to_display+=f"avg_step_time: {self.avg_step_time:.4f}s\n"
+        text_to_display+=f"real_time_factor: {self.real_time_factor:.4f}\n"
+        text_to_display+=f"{"#"*20}\n"
+        return text_to_display
+
+    def __rich__(self):
+        table = Table.grid(padding=(0, 2))
+
+        table.add_row("real_time", f"{self.real_time:.4f}s")
+        table.add_row("simulated_time", f"{self.simulated_time:.4f}s")
+        table.add_row("total_steps", str(self.total_steps))
+        table.add_row("total_substeps", str(self.total_substeps))
+        table.add_row("avg_step_time", f"{self.avg_step_time:.4f}s")
+        table.add_row("real_time_factor", f"{self.real_time_factor:.4f}")
+
+        return Panel(
+            table,
+            title=f"[bold]{self.name}[/bold]",
+            border_style="cyan"
+            ,width=60
+        )
+
 @dataclass
 class PhysicsErrorMetricResult(MetricResult):
     energy_drift: float 
@@ -67,16 +118,47 @@ class PhysicsErrorMetricResult(MetricResult):
     joint_constraint_error_avg: float
     
     name: str 
+
+    def __str__(self):
+        text_to_display=""
+        text_to_display+=f"\n{"#"*20}\nMetric: {self.name}\n{"#"*20}\n"
+        text_to_display+=f"energy_drift: {self.energy_drift*100:.4f}%\n"
+        text_to_display+=f"energy_min: {self.energy_min:.4f} J\n"
+        text_to_display+=f"energy_max: {self.energy_max:.4f} J\n"
+        text_to_display+=f"trajectory_reference_avg_error: {self.trajectory_reference_avg_error:.4f} px\n"
+        text_to_display+=f"trajectory_reference_endpoint_drift: {self.trajectory_reference_endpoint_drift[0]} (length: {self.trajectory_reference_endpoint_drift[1]:.4f} px)\n"
+        text_to_display+=f"joint_constraint_error_max: {self.joint_constraint_error_max:.4f} px\n"
+        text_to_display+=f"joint_constraint_error_avg: {self.joint_constraint_error_avg:.4f} px\n"
+        text_to_display+=f"{"#"*20}\n"
+        return text_to_display
+
+    def __rich__(self):
+        table = Table.grid(padding=(0, 2))
+
+        table.add_row("energy_drift", f"{self.energy_drift*100:.4f}%")
+        table.add_row("energy_min", f"{self.energy_min:.4f} J")
+        table.add_row("energy_max", f"{self.energy_max:.4f} J")
+        table.add_row("trajectory_reference_avg_error", f"{self.trajectory_reference_avg_error:.4f} px")
+        table.add_row("trajectory_reference_endpoint_drift", f"{self.trajectory_reference_endpoint_drift[0]} (length: {self.trajectory_reference_endpoint_drift[1]:.4f} px)")
+        table.add_row("joint_constraint_error_max", f"{self.joint_constraint_error_max:.4f} px")
+        table.add_row("joint_constraint_error_avg", f"{self.joint_constraint_error_avg:.4f} px")
+
+        return Panel(
+            table,
+            title=f"[bold]{self.name}[/bold]",
+            border_style="cyan"
+            ,width=60
+        )
 @dataclass
 class PhysicsErrorMetric(Metric):
     def start(self, **kwargs):
         self.objects : List[PhysicalObject] = kwargs["objects"]
         self.joints : List[Joint] = kwargs["joints"]
 
-        self.trajectory_arr: List[List[Vector]] = [[Vector(0,0)]]
+        self.trajectory_arr: List[List[Vector]] = [[]]
         self.reference_trajectory: List[List[Vector]] = kwargs["reference_trajectory"]
 
-        self.joint_constraint_arr : List[List[float]] = [[0]]
+        self.joint_constraint_arr : List[List[float]] = [[]]
         self.joint_constraint_reference : List[List[float]] = kwargs["joint_constraint_reference"]
 
         self.step=0
@@ -87,7 +169,7 @@ class PhysicsErrorMetric(Metric):
            summ_elong=0
            for sector in joint.sectors:
                summ_elong+= sector.elong
-               self.start_energy+=sector.elong * sector.stiffnes_cf
+               self.start_energy+=1/2*sector.elong**2 * sector.stiffnes_cf
         self.energy_min = self.start_energy
         self.energy_max = self.start_energy
 
@@ -106,7 +188,7 @@ class PhysicsErrorMetric(Metric):
             summ_elong=0
             for sector in joint.sectors:
                 summ_elong+=sector.elong
-                energy+=sector.elong * sector.stiffnes_cf
+                energy+=1/2*sector.elong**2 * sector.stiffnes_cf
             try:
                 self.joint_constraint_arr[i].append(summ_elong)
             except IndexError:
@@ -123,9 +205,9 @@ class PhysicsErrorMetric(Metric):
         avg_error_list : List[float]= []
         endpoint_drift_list : List[Vector]= []
 
-        for i in range(0, len(self.reference_trajectory)):
+        for i in range(0, len(self.trajectory_arr)):
             avg_error=0
-            for j in range(0, len(self.reference_trajectory[i])):
+            for j in range(0, len(self.trajectory_arr[i])):
                 avg_error += (self.trajectory_arr[i][j] - self.reference_trajectory[i][j]).get_length()
             avg_error /= len(self.trajectory_arr[i])
             avg_error_list.append(avg_error)
@@ -137,14 +219,14 @@ class PhysicsErrorMetric(Metric):
         for endpoint_drift in endpoint_drift_list:
             sum_endpoints_drift+=endpoint_drift
         avg_endpoint_drift : Vector =sum_endpoints_drift/len(endpoint_drift_list)
-        avg_endpoint_drift_length=avg_endpoint_drift.get_length()
+        avg_endpoint_drift_length=sum([endpoint_drift.get_length() for endpoint_drift in endpoint_drift_list])/len(endpoint_drift_list)
 
         avg_constraint_err_list: List[float]=[]
         constraint_err_max = 0
-        for i in range(0, len(self.joint_constraint_reference)): 
+        for i in range(0, len(self.joint_constraint_arr)): 
             avg_constraint_err=0
-            for j in range(0, len(self.joint_constraint_reference[i])):
-                err=abs(self.joint_constraint_arr[i][j]-self.joint_constraint_reference[i][j])
+            for j in range(0, len(self.joint_constraint_arr[i])):
+                err=abs(abs(self.joint_constraint_arr[i][j])-abs(self.joint_constraint_reference[i][j]))
                 avg_constraint_err+=err
                 if err > constraint_err_max:
                     constraint_err_max = err
@@ -197,7 +279,7 @@ class PerformanceMetric(Metric):
 
 
 class Benchmark():
-    def __init__(self, scene_name : str, steps: int, physics_dt : float, metrics: List[Metric], substeps: int, reference_to_target_substep_factor: float = 0):
+    def __init__(self, scene_name : str, steps: int, physics_dt : float, metrics: List[Metric], substeps: int, reference_to_target_substep_factor: float = 1):
         try:
             self.scene = load_scene(scene_name, path="./benchmarks/scenes/", substeps=substeps)
         except FileNotFoundError:
@@ -266,7 +348,7 @@ class BenchmarkConfig():
     physics_dt:float
     metrics: List[Metric]
     substeps: int
-    reference_to_target_substep_factor : float=0
+    reference_to_target_substep_factor : float=1
 
 
 def benchmark_worker(config: BenchmarkConfig):
@@ -276,31 +358,14 @@ def benchmark_worker(config: BenchmarkConfig):
 
 
 class Sweep():
-    def __init__(self, scene_name : str, steps: int | List[int], physics_dt : float | List[float], metrics: List[Metric] , substeps: int | List[int], reference_to_target_substep_factor: float | List[float] = 0):
+    def __init__(self, scene_name : str, steps: int | List[int], physics_dt : float | List[float], metrics: List[Metric] , substeps: int | List[int], reference_to_target_substep_factor: float | List[float] = 1):
         self.max_process = max(1, cpu_count()-2)
-        max_len_params=1
-        if isinstance(steps, list) and len(steps) > max_len_params:
-            if max_len_params != 1:
-                raise ValueError("Parameter array must be the same length or single value")
-            max_len_params = len(steps)
+        params_lens= [len(param) if isinstance(param, list) else 1 for param in [steps, physics_dt, substeps, reference_to_target_substep_factor]]
+        for param in [steps, physics_dt, substeps, reference_to_target_substep_factor]:
+            if isinstance(param, list) and len(param) not in params_lens:
+                raise ValueError("All list parameters must have the same length.")    
 
-        if isinstance(physics_dt, list) and len(physics_dt) > max_len_params:
-            if max_len_params != 1:
-                raise ValueError("Parameter array must be the same length or single value")
-            max_len_params = len(physics_dt)
-
-        if isinstance(substeps, list) and len(substeps) > max_len_params:
-            if max_len_params != 1:
-                raise ValueError("Parameter array must be the same length or single value")
-            max_len_params = len(substeps)
-
-        if isinstance(reference_to_target_substep_factor, list) and len(reference_to_target_substep_factor) > max_len_params:
-            if max_len_params != 1:
-                raise ValueError("Parameter array must be the same length or single value")
-            max_len_params = len(reference_to_target_substep_factor)
-
-
-        self.benchmarks_count = max_len_params
+        self.benchmarks_count = max(params_lens)
 
         self.scene_name = scene_name
         self.steps = steps
@@ -361,13 +426,14 @@ def main():
 
     benchmarks.append(Sweep(
         scene_name="pendulum_cart_test",
-        steps=10000,
+        steps=100,
         physics_dt=1/120,
-        reference_to_target_substep_factor= [20, 15, 12, 10, 6, 5],
+        reference_to_target_substep_factor= 4,
         metrics=[
-                 PhysicsErrorMetric()
+                    PerformanceMetric(),
+                    PhysicsErrorMetric()
                 ],
-        substeps= [3, 4, 5, 6, 10, 12]
+        substeps= 4
     ))
 
 
@@ -416,8 +482,9 @@ def main():
 
             console.print(metric_table)
         else:
-            console.print(result_metrics)
-            
+            for metric in result_metrics:
+                for submetric in metric:
+                    console.print(submetric)
 
 if __name__ == "__main__":
     main()

@@ -6,7 +6,7 @@ from math import radians, degrees, pi
 
 from .collider import Collider
 
-from .utils import Vector
+from .utils import Vector, PhysicalObjectState
 from configs.settings import SUBSTEPS, GRAV_CONST
 
 @dataclass(frozen=True)
@@ -137,24 +137,17 @@ class PhysicalObject(sprite.Sprite):
         fields.__dict__.update(**self.__dict__, corners = self.relative_corners, start_pos = start_pos, start_velocity=self.velocity, start_angle=degrees(self.angle), start_angular_velocity=degrees(self.angular_velocity))
         return fields
 
-    def integrate(self, dt):
-        self.acceleration = self.resultant_force / self.mass
-        self.velocity += self.acceleration * dt   
-        self.pos += self.velocity*dt
+    def get_state(self) -> PhysicalObjectState:
+        state = PhysicalObjectState(**{k: v for k, v in self.__dict__.items() if k in PhysicalObjectState.__dataclass_fields__})
+        return state
 
-        self.angular_acceleration =self.resultant_torque / self.moment_of_inertia
-        self.angular_velocity += self.angular_acceleration *dt
-        self.angle += self.angular_velocity* dt
-
-        #check if angle is out of bounds
-        if self.angle // (2*pi) !=0 and self.angle != (2*pi) :
-            self.angle = self.angle - (self.angle//(2*pi)) *2*pi
-
+    def apply_state(self, state: PhysicalObjectState):
+        self.__dict__.update(**state.__dict__)
         if (self.collider.type in ("Box", "Polygon")):
             self.collider.get_world_corners(self)
         self.collider.center=self.pos 
         self.clear_forces()
-    
+
     def calc_forces(self):
         if self.gravity:
             gravity_force = Vector(0, -GRAV_CONST * self.mass)
@@ -168,9 +161,6 @@ class PhysicalObject(sprite.Sprite):
     def clear_forces(self):
         self.resultant_force=Vector(0,0)
         self.resultant_torque=0
-
-    def update(self, dt):
-        self.integrate(dt)
 
 class Obstacle():
     def __init__(self, x0,x1, y0,y1):

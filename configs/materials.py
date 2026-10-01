@@ -22,10 +22,10 @@ box_cfg = ObjectConfig(
 )
 rubber_ball = ObjectConfig(
 
-    stiffnes_cf=1000,
-    density=1,
-    friction_cf=0.6,
-    restitution=0.2,
+    stiffnes_cf=5000,
+    density=10,
+    friction_cf=0.8,
+    restitution=1,
     gravity=True,
     draw_trajectory=False
 )

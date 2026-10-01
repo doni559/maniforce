@@ -5,7 +5,7 @@ from configs.settings import GRAV_CONST
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from os import cpu_count
 
-from physics.utils import Vector
+from physics.utils import Vector, Integrator, EulerIntegrator, VerletIntegrator
 from physics.bodies import PhysicalObject
 from physics.connections import Joint
 
@@ -279,9 +279,9 @@ class PerformanceMetric(Metric):
 
 
 class Benchmark():
-    def __init__(self, scene_name : str, steps: int, physics_dt : float, metrics: List[Metric], substeps: int, reference_to_target_substep_factor: float = 1):
+    def __init__(self, scene_name : str, steps: int, physics_dt : float, metrics: List[Metric], substeps: int, reference_to_target_substep_factor: float = 1, integrator_type: Integrator = EulerIntegrator):
         try:
-            self.scene = load_scene(scene_name, path="./benchmarks/scenes/", substeps=substeps)
+            self.scene = load_scene(scene_name, path="./benchmarks/scenes/", substeps=substeps, used_integrator=integrator_type)
         except FileNotFoundError:
             print("Save does not exist. Create one and load using its name.")
         self.steps = steps
@@ -299,7 +299,7 @@ class Benchmark():
                 start_time= perf_counter()
                 objects_list = self.scene.objects
                 joints_list= self.scene.joints
-                copy_scene= load_scene(self.scene.name, path="./benchmarks/scenes/", substeps=self.scene.substeps*self.reference_to_target_substep_factor)
+                copy_scene= load_scene(self.scene.name, path="./benchmarks/scenes/", substeps=self.scene.substeps*self.reference_to_target_substep_factor, used_integrator=self.scene.used_integrator)
                 reference_trajectory=[]
                 reference_constraint=[]
                 for i in range(self.steps):
@@ -339,6 +339,7 @@ class Benchmark():
         result_metrics : List[MetricResult]=[]
         for metric in self.metrics:
             result_metrics.append(metric.end())
+
         return result_metrics
 
 @dataclass(frozen=True)
@@ -348,7 +349,8 @@ class BenchmarkConfig():
     physics_dt:float
     metrics: List[Metric]
     substeps: int
-    reference_to_target_substep_factor : float=1
+    reference_to_target_substep_factor : float=1,
+    integrator_type: Integrator = EulerIntegrator
 
 
 def benchmark_worker(config: BenchmarkConfig):
@@ -358,10 +360,10 @@ def benchmark_worker(config: BenchmarkConfig):
 
 
 class Sweep():
-    def __init__(self, scene_name : str, steps: int | List[int], physics_dt : float | List[float], metrics: List[Metric] , substeps: int | List[int], reference_to_target_substep_factor: float | List[float] = 1):
+    def __init__(self, scene_name : str, steps: int | List[int], physics_dt : float | List[float], metrics: List[Metric] , substeps: int | List[int], reference_to_target_substep_factor: float | List[float] = 1, integrator_type: List[Integrator] | Integrator = EulerIntegrator):
         self.max_process = max(1, cpu_count()-2)
-        params_lens= [len(param) if isinstance(param, list) else 1 for param in [steps, physics_dt, substeps, reference_to_target_substep_factor]]
-        for param in [steps, physics_dt, substeps, reference_to_target_substep_factor]:
+        params_lens= [len(param) if isinstance(param, list) else 1 for param in [steps, physics_dt, substeps, reference_to_target_substep_factor, integrator_type]]
+        for param in [steps, physics_dt, substeps, reference_to_target_substep_factor, integrator_type]:
             if isinstance(param, list) and len(param) not in params_lens:
                 raise ValueError("All list parameters must have the same length.")    
 
@@ -373,7 +375,7 @@ class Sweep():
         self.metrics=metrics
         self.substeps=substeps
         self.reference_to_target_substep_factor=reference_to_target_substep_factor
-
+        self.integrator_type=integrator_type
     def simulate(self):
         configs : List[BenchmarkConfig]=[]
         for i in range(0, self.benchmarks_count):
@@ -394,13 +396,18 @@ class Sweep():
                 reference_to_target_substep_factor = self.reference_to_target_substep_factor[i]
             else:
                 reference_to_target_substep_factor=self.reference_to_target_substep_factor
+            if isinstance(self.integrator_type, list):
+                integrator_type = self.integrator_type[i]
+            else:
+                integrator_type=self.integrator_type
             config = BenchmarkConfig(
                 scene_name=self.scene_name,
                 steps=steps,
                 physics_dt=physics_dt,
                 metrics=self.metrics,
                 substeps=substeps,
-                reference_to_target_substep_factor=reference_to_target_substep_factor
+                reference_to_target_substep_factor=reference_to_target_substep_factor,
+                integrator_type=integrator_type
             )
             configs.append(config)
         with ProcessPoolExecutor(max_workers=min(self.benchmarks_count, self.max_process)) as executor:
@@ -425,15 +432,16 @@ def main():
     console= Console()
 
     benchmarks.append(Sweep(
-        scene_name="pendulum_cart_test",
-        steps=100,
+        scene_name="pendulum",
+        steps=10000,
         physics_dt=1/120,
-        reference_to_target_substep_factor= 4,
+        reference_to_target_substep_factor= 16,
         metrics=[
                     PerformanceMetric(),
                     PhysicsErrorMetric()
                 ],
-        substeps= 4
+        substeps= [1,2,4,8, 16, 1, 2, 4, 8, 16],
+        integrator_type=[VerletIntegrator(),VerletIntegrator(), VerletIntegrator(), VerletIntegrator(), VerletIntegrator(), EulerIntegrator(), EulerIntegrator(), EulerIntegrator(), EulerIntegrator(), EulerIntegrator()]
     ))
 
 
@@ -445,7 +453,8 @@ def main():
                 "steps",
                 "physics_dt",
                 "substeps",
-                "reference_to_target_substep_factor"
+                "reference_to_target_substep_factor",
+                "integrator_type"
             ]
 
             sweep_fields = [
@@ -461,10 +470,11 @@ def main():
                             metric_fields.append(field)
 
             for field in sweep_fields + metric_fields:
-                metric_table.add_column(field, justify="center", min_width= len(field)/3, max_width=int(len(field)/1.2))
+                metric_table.add_column(field, justify="center")
 
             for i, metrics in enumerate(result_metrics):
                 metric_values = {}
+        
 
                 for metric in metrics:
                     metric_values.update(metric.__dict__)

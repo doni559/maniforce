@@ -73,13 +73,13 @@ class CollisionCalculator():
                         another.apply_force(-collision_force, position)  
 
             for collider in self.colliders:
+
                 normal, contact_points = target.collider.calculate_deformation(collider.collider, target.pos, collider.center)
                 if normal != Vector(0,0):
                     for contact_point in contact_points:
                         position=contact_point["pos"]
                         deformation=contact_point["deformation"]
                         torque_leverarm : Vector= position-target.pos
-                    
                         spring_force : Vector= normal * target.stiffness_cf * abs(deformation)
                         dot_rotational_velocity = Vector(
                                                 -target.angular_velocity * torque_leverarm.y,

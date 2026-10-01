@@ -1,9 +1,11 @@
-from math import sqrt, sin, cos
+from math import pi, sqrt, sin, cos
 from pygame import draw
 
 from typing import Tuple, List
 
-from configs.settings import HEIGHT, EPS
+from configs.settings import HEIGHT
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 class Vector():
     def __init__(self, x, y):
@@ -103,3 +105,78 @@ class Vector():
 def clamp(x, left, right) -> float:
     return max(left, min(x, right))
 
+@dataclass
+class PhysicalObjectState():
+    pos: Vector
+    velocity: Vector
+    resultant_force: Vector
+    acceleration: Vector
+    mass: float
+    moment_of_inertia: float
+
+    resultant_torque: float
+    angle: float
+    angular_velocity: float
+    angular_acceleration: float
+
+@dataclass
+class JointNodeState():
+    pos: Vector
+    velocity: Vector
+    resultant_force: Vector
+    acceleration: Vector
+    mass: float
+
+class Integrator(ABC):
+    @abstractmethod
+    def integrate(self, state: PhysicalObjectState, dt: float):...
+
+    def __str__(self):
+        return "Integrator"
+
+class EulerIntegrator(Integrator):
+    def integrate(self, state: PhysicalObjectState | JointNodeState, dt: float):
+        state.acceleration = state.resultant_force / state.mass
+
+        state.velocity += state.acceleration * dt
+        state.pos += state.velocity * dt
+
+        if isinstance(state, PhysicalObjectState):
+            state.angular_acceleration = state.resultant_torque / state.moment_of_inertia
+            state.angular_velocity += state.angular_acceleration * dt
+            state.angle += state.angular_velocity * dt
+
+            #check if angle is out of bounds
+            if state.angle // (2*pi) !=0 and state.angle != (2*pi) :
+                state.angle = state.angle - (state.angle//(2*pi)) *2*pi
+        return state
+
+    def __str__(self):
+        return "EulerIntegrator"
+
+class VerletIntegrator(Integrator):
+    def pre_integrate(self, state: PhysicalObjectState | JointNodeState, dt: float):
+        state.acceleration = state.resultant_force / state.mass
+        state.pos += state.velocity * dt + 0.5 * state.acceleration * dt**2
+
+        if isinstance(state, PhysicalObjectState):
+            state.angular_acceleration = state.resultant_torque / state.moment_of_inertia
+            state.angle += state.angular_velocity * dt + 0.5 * state.angular_acceleration * dt**2
+        return state
+    def integrate(self, state: PhysicalObjectState | JointNodeState, prev_acceleration: Vector, prev_angular_acceleration: float | None, dt: float):
+        state.acceleration = state.resultant_force / state.mass
+        state.velocity+=1/2*(prev_acceleration + state.acceleration)*dt
+        if isinstance(state, PhysicalObjectState):
+            state.angular_acceleration = state.resultant_torque / state.moment_of_inertia
+            state.angular_velocity+=1/2*(prev_angular_acceleration + state.angular_acceleration)*dt
+
+            #check if angle is out of bounds
+            if state.angle // (2*pi) !=0 and state.angle != (2*pi) :
+                state.angle = state.angle - (state.angle//(2*pi)) *2*pi
+        return state
+
+    def __str__(self):
+        return "VerletIntegrator"
+
+    def __repr__(self):
+        return self.__str__()

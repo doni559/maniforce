@@ -1,10 +1,10 @@
 from .bodies import PhysicalObject
-from .utils import Vector
+from .utils import Vector, JointNodeState
 from .collider import Collider
 
 from configs.settings import GRAV_CONST, SUBSTEPS
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import List
 from abc import ABC,abstractmethod
 
@@ -52,6 +52,9 @@ class JointNode(JointEndpoint):
     pos: Vector
     mass: float
     friction_cf: float
+    acceleration: Vector = field(
+        default_factory=lambda: Vector(0, 0)
+    )
     
     velocity: Vector = field(
         default_factory=lambda: Vector(0, 0)
@@ -76,14 +79,15 @@ class JointNode(JointEndpoint):
     def apply_force(self, force):
         self.resultant_force+=force
 
-    def integrate(self,dt):
-        self.resultant_force+= Vector(0, -self.mass*GRAV_CONST)
+    def get_state(self) -> JointNodeState:
+        state = JointNodeState(**{k: v for k, v in asdict(self).items() if k in JointNodeState.__dataclass_fields__})
+        return state
 
-        self.velocity+=((self.resultant_force/self.mass) * dt)
-        self.pos += self.velocity*dt
-        self.collider.center= self.pos
+    def apply_state(self, state: JointNodeState):
+        self.velocity=state.velocity
+        self.pos=state.pos
+        self.acceleration=state.acceleration 
         self.resultant_force=Vector(0,0)
-
 
 @dataclass
 class JointSector():
@@ -112,9 +116,6 @@ class JointSector():
         damping_force = normal * self.damping_cf * relative_velocity.scalar_multiply(normal)
 
         resultant_force = spring_force+ damping_force
-        #if can push 
-        # if (resultant_force.scalar_multiply(normal) < 0):
-        #     resultant_force= Vector(0,0)
 
         if resultant_force.get_length() > self.force_limit:
             self.to_destroy= True
@@ -183,7 +184,6 @@ class Joint():
             self.endpoints.append(node)
 
         self.endpoints.append(last_node)
-
         for N in range(0, (len(self.endpoints)-1)):
             node_a = self.endpoints[N]
             node_b = self.endpoints[N+1]
@@ -202,11 +202,6 @@ class Joint():
             if sector.to_destroy == True:
                 self.destroy_joint()
     
-    def update(self, dt):
-        for node in self.endpoints:
-            if isinstance(node, JointNode):
-                node.integrate(dt)
-
     def destroy_joint(self):
         self.to_destroy=True
 

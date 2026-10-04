@@ -229,7 +229,7 @@ class Collider():
                 penetration=min(a_interval[1]-t_interval[0], t_interval[1]-a_interval[0])
                 #check if projections are overlapping
                 if penetration < 0:
-                    #then no collision, return normal=0 (no need), deformation=0
+                    #then no collision, return normal=Vector(0,0 ), deformation=[]
                     return Vector(0,0), [] 
                 penetrations.append(penetration)  
             deformation=min(penetrations)

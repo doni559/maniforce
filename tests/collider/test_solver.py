@@ -53,12 +53,13 @@ def bodies(rectangular_body, circle_body):
     circle_0.update(0)
     circle_1.update(0)
 
-    collision_solver = CollisionCalculator(Group([rect_0, rect_1, circle_0, circle_1]),[],[])
+    collision_solver = CollisionCalculator([rect_0, rect_1, circle_0, circle_1],[],[])
 
     return rect_0, rect_1, circle_0, circle_1, collision_solver
 
 def do_step(*bodies):
     for body in bodies:
+        body: PhysicalObject  
         body.update(0)
         body.velocity=Vector(0,0)
         body.angular_velocity=0
@@ -93,10 +94,10 @@ def test_solver_central_case(bodies):
     circle_1.pos= Vector(0, 649)
 
     do_step(rect_0, rect_1, circle_0, circle_1)
-    collision_solver = CollisionCalculator(Group([rect_0, rect_1]), [], [])
+    collision_solver = CollisionCalculator([rect_0, rect_1], [], [])
     collision_solver.calculate_collisions_penalty()
 
-    collision_solver = CollisionCalculator(Group([circle_0, circle_1]), [], [])
+    collision_solver = CollisionCalculator([circle_0, circle_1], [], [])
     collision_solver.calculate_collisions_penalty()
 
     assert rect_0.resultant_force != Vector(pytest.approx(0),pytest.approx(0))

@@ -87,7 +87,7 @@ class JointNode(JointEndpoint):
         self.velocity=state.velocity
         self.pos=state.pos
         self.acceleration=state.acceleration 
-        self.resultant_force=Vector(0,0)
+        self.resultant_force=Vector(0,-GRAV_CONST*self.mass)
 
 @dataclass
 class JointSector():
@@ -204,6 +204,20 @@ class Joint():
     
     def destroy_joint(self):
         self.to_destroy=True
+
+    def get_lines_to_draw(self) -> List[List[Vector]]:
+        sectors = []
+        for sector in self.sectors:
+            start_point = sector.node_a.get_pos()
+            end_point = sector.node_b.get_pos()
+        
+            vector : Vector= end_point-start_point
+            sectors.append(
+                [start_point, vector]
+            )
+        return sectors
+            
+
 
     def draw_joint(self, screen: Surface, camera_pos : List[float], camera_zoom: float):
         for sector in self.sectors:

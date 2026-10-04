@@ -146,6 +146,10 @@ class PhysicalObject(sprite.Sprite):
         if (self.collider.type in ("Box", "Polygon")):
             self.collider.get_world_corners(self)
         self.collider.center=self.pos 
+        if self.draw_trajectory == True:
+            self.trajectory_arr.append(self.pos)
+            if len(self.trajectory_arr) > 500:
+                self.trajectory_arr = self.trajectory_arr[-500:-1]
         self.clear_forces()
 
     def calc_forces(self):

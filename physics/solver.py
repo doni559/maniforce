@@ -10,9 +10,9 @@ from .utils import Vector
 from configs.settings import EPS
 
 class CollisionCalculator():
-    def __init__(self, all_sprites : sprite.Group, all_obstacles: List[Obstacle], all_joints: List[Joint]):
+    def __init__(self, all_sprites : List[PhysicalObject], all_obstacles: List[Obstacle], all_joints: List[Joint]):
         self.colliders = all_obstacles
-        self.sprites= all_sprites.sprites()
+        self.sprites= all_sprites
         self.joints = all_joints
 
     def calculate_collisions_penalty(self):

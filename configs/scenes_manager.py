@@ -1,7 +1,6 @@
-from pygame import *
 from pygame.sprite import Group
 
-from physics.utils import Vector, Integrator, PhysicalObjectState, EulerIntegrator, VerletIntegrator
+from physics.utils import Vector, Integrator, EulerIntegrator, VerletIntegrator
 from physics.bodies import PhysicalObject, Obstacle, ObjectConfig, PhysicalObjectInitFields
 from physics.solver import CollisionCalculator
 from physics.connections import Joint, JointInitFields, JointNode
@@ -13,9 +12,25 @@ from typing import List
 
 from pathlib import Path
 import json
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 
 from configs.materials import ball, box, polygon, rope
+
+@dataclass(frozen=True, slots=True)
+class ObjectSnapshot():
+    id = int
+
+    type: Joint | PhysicalObject | Obstacle | None
+    form: str
+    points: List[Vector]
+    width : float | None = None
+    radius: float | None = None
+    angle : float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SceneSnapshot():
+    objects: List[ObjectSnapshot]   
 
 class Scene():
     def __init__(self, load:bool, name:str,used_integrator : Integrator, objects: List[PhysicalObject]=[], obstacles: List[Obstacle]=[], joints : List[Joint] = [], substeps: int = SUBSTEPS):
@@ -23,15 +38,12 @@ class Scene():
             self.name= name
             self.used_integrator = used_integrator
 
-
-            self.sprites= Group(objects)
-
             self.objects = objects
             self.obstacles = obstacles
             self.joints = joints
             self.substeps = substeps
 
-            self.collisions=CollisionCalculator(self.sprites, self.obstacles, self.joints)
+            self.collisions=CollisionCalculator(self.objects, self.obstacles, self.joints)
         else:
             self.__init__(**load_scene(name, substeps=substeps, used_integrator=used_integrator).get_fields())
 
@@ -44,7 +56,7 @@ class Scene():
                     if joint.to_destroy == True:
                         joint_to_destroy.append(joint)
                 self.collisions.calculate_collisions_penalty()
-                for sprite in self.sprites:
+                for sprite in self.objects:
                     sprite: PhysicalObject = sprite
                     sprite.calc_forces()
 
@@ -64,7 +76,7 @@ class Scene():
                     joint.calculate()
                     if joint.to_destroy == True:
                         joint_to_destroy.append(joint)
-                for sprite in self.sprites:
+                for sprite in self.objects:
                     sprite: PhysicalObject = sprite
                     sprite.calc_forces()
                     state = sprite.get_state()
@@ -83,7 +95,7 @@ class Scene():
                         joint_to_destroy.append(joint)
                 self.collisions.calculate_collisions_penalty()
 
-                for sprite in self.sprites:
+                for sprite in self.objects:
                     sprite.calc_forces()
                     state = sprite.get_state()
                     old_acceleration = state.acceleration
@@ -102,37 +114,70 @@ class Scene():
         for joint in joint_to_destroy:
             self.remove_joint(joint)
         
-    
-    def render(self, screen:Surface, camera_pos: List[float], camera_zoom: float):
-        screen.fill((255, 255, 255))
-        for joint in self.joints:
-            joint.draw_joint(screen, camera_pos, camera_zoom)
-        for sprite in self.sprites.sprites():
-            sprite : PhysicalObject = sprite
-            #Collider draw
-            sprite.collider.draw(screen, (0,255,0), sprite.pos.convert_to_screen_cords(camera_pos, camera_zoom), camera_pos, camera_zoom)
-            #Draw origin. TODO: Add system flag
-            try:
-                origin_center = sprite.pos + sprite.origin_offset_local.rotate(sprite.angle)
-                draw.circle(screen, (255, 255, 0), origin_center.convert_to_screen_cords(camera_pos, camera_zoom),3*camera_zoom)
-            except:
-                pass
-            #Draw COM. TODO: Add system flag
-            draw.circle(screen, (255, 0, 255), sprite.pos.convert_to_screen_cords(camera_pos, camera_zoom),3*camera_zoom)
+    def make_snapshot(self):
+        objects_snapshots: List[ObjectSnapshot]=[]
+        for obj in self.objects:
+            collider = obj.collider
+            angle = obj.angle
 
-            #Trajectory render
-            if sprite.draw_trajectory:
-                for dot_index in range(1,len(sprite.trajectory_arr)):
-                    dot=sprite.trajectory_arr[dot_index]
-                    prev_dot = sprite.trajectory_arr[dot_index-1]
-                    draw.line(screen, (255, 0, 255), prev_dot.convert_to_screen_cords(camera_pos, camera_zoom), dot.convert_to_screen_cords(camera_pos, camera_zoom), width=3)
-                    
-                sprite.trajectory_arr.append(Vector(sprite.pos.x, sprite.pos.y))
-                if len(sprite.trajectory_arr) > 1000:
-                    sprite.trajectory_arr = sprite.trajectory_arr[-1000:-1]
-        #Obstacles render
+            if collider.type == "Circle":
+                radius = obj.radius
+                center = collider.center
+                form = "Circle"
+                snapshot = ObjectSnapshot(
+                    type=PhysicalObject,
+                    form = form,
+                    points=[center],
+                    radius=radius,
+                    angle=angle
+                )
+            elif collider.type == "Polygon":
+                points = collider.get_world_corners(obj)
+                form = "Polygon"
+                snapshot=ObjectSnapshot(
+                    type=PhysicalObject,
+                    form=form,
+                    points=points,
+                    angle=angle
+                )
+            objects_snapshots.append(snapshot)
+            
+            if obj.draw_trajectory == True:
+                for trajectory_point in obj.trajectory_arr:
+                    snapshot=ObjectSnapshot(
+                        type=None,
+                        form="Circle",
+                        points=[trajectory_point],
+                        radius=3
+                    )
+                    objects_snapshots.append(snapshot)
+
         for obstacle in self.obstacles:
-            obstacle.collider.draw(screen, (0,0,0), camera_pos=camera_pos, camera_zoom=camera_zoom)
+            form = "Polygon"
+            collider=obstacle.collider
+            points=collider.corners
+
+            snapshot=ObjectSnapshot(
+                type=Obstacle,
+                form=form,
+                points=points
+            )
+            objects_snapshots.append(snapshot)
+        for joint in self.joints:
+            form = "Line"
+            width = 4
+            lines=joint.get_lines_to_draw()
+            for line in lines:
+                points = line
+                snapshot = ObjectSnapshot(
+                    type=Joint,
+                    form=form,
+                    points=points,
+                    width=width
+                )
+                objects_snapshots.append(snapshot)
+        scene_snapshot= SceneSnapshot(objects_snapshots)
+        return scene_snapshot
 
     def remove_joint(self, target_joint: Joint):
         for i in range(0, len(self.joints)):
@@ -144,16 +189,14 @@ class Scene():
         init_fields.__dict__.update(kwargs)
 
         new_object = PhysicalObject(init_fields)
-
-        self.sprites.add(new_object)
         self.objects.append(new_object)
-        self.collisions = CollisionCalculator(self.sprites, self.obstacles, self.joints)
+        self.collisions = CollisionCalculator(self.objects, self.obstacles, self.joints)
         return new_object
 
     def add_obstacle(self, obstacle: Obstacle):
         self.obstacles.append(obstacle)
 
-        self.collisions = CollisionCalculator(self.sprites, self.obstacles, self.joints)
+        self.collisions = CollisionCalculator(self.objects, self.obstacles, self.joints)
 
     def add_joint(self, joint: Joint, **kwargs):
         init_fields=joint.get_fields()
@@ -166,7 +209,7 @@ class Scene():
         return new_joint
 
     def restart(self):
-        return load_scene(self.name, substeps=self.substeps)
+        return load_scene(self.name, substeps=self.substeps, used_integrator=self.used_integrator)
     
     def save_scene(self,path: str = "./scenes/"):
         objects = []
@@ -275,21 +318,6 @@ screen_borders = [
     Obstacle(WIDTH, WIDTH+100, 0, HEIGHT),
 ]
 
-scene_to_load = "stiff_rope_stability_test"
-scene = Scene(load=False, name=scene_to_load, obstacles=screen_borders, substeps=SUBSTEPS, used_integrator=VerletIntegrator())
-scene.add_object(ball, 
-                 start_pos=Vector(1000,400),
-                 start_velocity=Vector(-1000,0),
-                 radius=50
-                 )
+scene_to_load = "pendulum_cart_test"
+scene = Scene(load=True, name=scene_to_load, obstacles=screen_borders, substeps=SUBSTEPS, used_integrator=VerletIntegrator())
 
-scene.add_joint(
-    rope,
-    anchor_0 = scene.objects[0],
-    anchor_1 = Vector(1000, 1000),
-    stiffnes_cf = 10000,
-    nodes_count = 10,
-    damping_cf = 0.6,
-    joint_mass=0.4,
-)
-scene.save_scene()

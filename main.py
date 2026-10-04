@@ -2,9 +2,14 @@ from pygame import *
 from pygame.time import Clock
 from time import perf_counter
 
-from configs.scenes_manager import scene
-from configs.settings import HEIGHT, WIDTH, FPS, PHYSICS_DT, MAX_FRAME_TIME
+from configs.scenes_manager import scene, Scene, load_scene
+from configs.settings import HEIGHT, WIDTH, FPS, PHYSICS_DT, MIN_UNRENDERED_BUFFER_SIZE, MAX_BUFFER_SIZE
+from configs.renderer import Renderer
+
 from typing import Tuple
+
+from multiprocessing import Queue, Process, Event
+
 
 from math import e as euler
 
@@ -18,12 +23,42 @@ class UX():
     def display_fps(self, screen : Surface, clock: Clock):
         self.draw_text(f"{str(int(clock.get_fps()))} FPS", ( 10,10), (0,0,0), (255,255,255), screen)
 
+def physics_worker(scene: Scene, snapshots_buffer: Queue, stop_event):
+    wait = False
+    loaded_scene= Scene(**scene.get_fields())
+    prev_time=perf_counter()
+    while not stop_event.is_set():
+        cur_buffer_size=snapshots_buffer.qsize()
+        if cur_buffer_size < MIN_UNRENDERED_BUFFER_SIZE or wait == False:
+            if wait == True:
+                wait=False
+            
+            loaded_scene.step(PHYSICS_DT) 
+            snapshot = loaded_scene.make_snapshot()
+            snapshots_buffer.put(snapshot)
+            current_time=perf_counter()
+            past_time=(current_time-prev_time)
+            prev_time=perf_counter()
+            rtf= (PHYSICS_DT)/past_time
+        
+            print(rtf, cur_buffer_size)
+            
+        if cur_buffer_size >= MAX_BUFFER_SIZE:
+            wait= True
+    snapshots_buffer.close()
+    return
+
+
+            
+
+
+
 def main():  
     init()
     run= True
     pause = False
 
-    camera_speed= 5
+    camera_speed= 10
     camera_pos = [0 , 0]
     camera_moving=[0, 0]
     
@@ -36,32 +71,26 @@ def main():
 
     screen = display.get_surface()
     clock = time.Clock()
-    ux= UX(50)
-    loaded_scene = scene
 
-    accumulator = 0
-    previous_time = perf_counter()
-    
+    snapshot_buffer = Queue(maxsize=MAX_BUFFER_SIZE)
+    renderer = Renderer(snapshot_buffer)
+    ux= UX(50)
+
+    loaded_scene = scene
+    stop_event=Event()
+
+    physics_process = Process(target=physics_worker, args=(loaded_scene, snapshot_buffer, stop_event))
+    physics_process.start()
+
 
     while run:
-        if not pause:
-            current_time = perf_counter()
-            frame_time = current_time-previous_time
-            # frame_time = min(frame_time, MAX_FRAME_TIME)
-            previous_time = perf_counter()
-
-            accumulator += frame_time
-            while accumulator >= PHYSICS_DT:
-                loaded_scene.step(PHYSICS_DT)
-                accumulator -= PHYSICS_DT
-        if pause:
-            previous_time = perf_counter()
-
-        loaded_scene.render(screen, camera_pos, camera_zoom)
+        
+        renderer.render(screen, camera_pos, camera_zoom)
         ux.display_fps(screen, clock)
         display.flip()
-
+    
         clock.tick(FPS)
+
         camera_zoom*=euler**camera_zooming
         camera_pos[0]+=camera_moving[0]
         camera_pos[1]+=camera_moving[1]
@@ -100,8 +129,11 @@ def main():
                     camera_moving[0]=0
                 if e.key in (K_z, K_x):
                     camera_zooming=0
-            if e.type == QUIT: 
+            if e.type == QUIT:
                 run = False
+    stop_event.set()
+    physics_process.kill()
+    physics_process.join()
     quit()
 
 if __name__ == "__main__":

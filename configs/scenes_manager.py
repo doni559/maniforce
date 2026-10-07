@@ -55,7 +55,6 @@ class Scene():
                     joint.calculate()
                     if joint.to_destroy == True:
                         joint_to_destroy.append(joint)
-                self.collisions.calculate_collisions_penalty()
                 for sprite in self.objects:
                     sprite: PhysicalObject = sprite
                     sprite.calc_forces()
@@ -70,6 +69,8 @@ class Scene():
                             state = endpoint.get_state()
                             new_state = self.used_integrator.integrate(state, dt/self.substeps)
                             endpoint.apply_state(new_state)
+                self.collisions.calculate_collisions_penalty()
+                
                 
             elif isinstance(self.used_integrator, VerletIntegrator):
                 for joint in self.joints:
@@ -320,4 +321,5 @@ screen_borders = [
 
 scene_to_load = "pendulum_cart_test"
 scene = Scene(load=True, name=scene_to_load, obstacles=screen_borders, substeps=SUBSTEPS, used_integrator=VerletIntegrator())
+
 

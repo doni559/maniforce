@@ -1,6 +1,10 @@
 from physics.bodies import PhysicalObject
-from physics.utils import Vector
+from physics.utils import Vector, EulerIntegrator
+
+from configs.scenes_manager import Scene
+
 from . import box_cfg, rubber_ball
+
 
 import pytest
 from typing import List
@@ -44,18 +48,13 @@ def bodies(rectangular_body, circle_body):
     circle_0 = PhysicalObject(circle_body.get_fields())
     circle_1 = PhysicalObject(circle_body.get_fields())
 
-    rect_0.update(0)
-    rect_1.update(0)
-    circle_0.update(0)
-    circle_1.update(0)
+    scene = Scene(load=False, name="tests", used_integrator=EulerIntegrator(), objects=[rect_0,rect_1,circle_0,circle_1])
+    scene.step(0)
 
-    return rect_0, rect_1, circle_0, circle_1
+    return rect_0, rect_1, circle_0, circle_1, scene
 
-def do_collisions(rect_0 : PhysicalObject, rect_1: PhysicalObject, circle_0:PhysicalObject, circle_1: PhysicalObject):
-    rect_0.update(0)
-    rect_1.update(0)
-    circle_0.update(0)
-    circle_1.update(0)
+def do_collisions(rect_0 : PhysicalObject, rect_1: PhysicalObject, circle_0:PhysicalObject, circle_1: PhysicalObject, scene: Scene):
+    scene.step(0)
 
     collision_0 = rect_0.collider.calculate_deformation(rect_1.collider, rect_0.pos, rect_1.pos)
     _collision_0 = rect_1.collider.calculate_deformation(rect_0.collider, rect_1.pos, rect_0.pos)
@@ -85,7 +84,7 @@ def get_contact_manifolds(normal: Vector,contact_points_0 :List[Vector],contact_
 
 
 def test_no_collsion(bodies):
-    rect_0, rect_1, circle_0, circle_1 = bodies
+    rect_0, rect_1, circle_0, circle_1, scene = bodies
     none_set = (Vector(0,0), [])
     rect_0.pos=Vector(0, 500)
     rect_1.pos=Vector(300,500)
@@ -94,7 +93,7 @@ def test_no_collsion(bodies):
     circle_1.pos= Vector(400, 500)
 
 
-    collision_0, collision_1, collision_2, _collision_0, _collision_1, _collision_2 = do_collisions(rect_0, rect_1, circle_0, circle_1)
+    collision_0, collision_1, collision_2, _collision_0, _collision_1, _collision_2 = do_collisions(rect_0, rect_1, circle_0, circle_1, scene)
     
     
     assert collision_0 == _collision_0 == none_set
@@ -102,7 +101,7 @@ def test_no_collsion(bodies):
     assert collision_2 == _collision_2 == none_set
 
 def test_edge_collision(bodies):
-    rect_0, rect_1, circle_0, circle_1 = bodies
+    rect_0, rect_1, circle_0, circle_1, scene = bodies
     none_set = (Vector(0,0), [])
 
     rect_0.pos=Vector(0, 500)
@@ -112,14 +111,14 @@ def test_edge_collision(bodies):
     circle_1.pos= Vector(0, 650)
 
 
-    collision_0, collision_1, collision_2, _collision_0, _collision_1, _collision_2 = do_collisions(rect_0, rect_1, circle_0, circle_1)
+    collision_0, collision_1, collision_2, _collision_0, _collision_1, _collision_2 = do_collisions(rect_0, rect_1, circle_0, circle_1, scene)
 
     assert collision_0 == _collision_0 == none_set
     assert collision_1 == _collision_1 == none_set
     assert collision_2 == _collision_2 == none_set
 
 def test_collision(bodies):
-    rect_0, rect_1, circle_0, circle_1 = bodies
+    rect_0, rect_1, circle_0, circle_1, scene = bodies
 
     rect_0.pos=Vector(0, 500)
     rect_1.pos=Vector(99,500)
@@ -128,7 +127,7 @@ def test_collision(bodies):
     circle_1.pos= Vector(0, 649)
 
 
-    collision_0, collision_1, collision_2, _collision_0, _collision_1, _collision_2 = do_collisions(rect_0, rect_1, circle_0, circle_1)
+    collision_0, collision_1, collision_2, _collision_0, _collision_1, _collision_2 = do_collisions(rect_0, rect_1, circle_0, circle_1, scene)
 
     collision_0_manifold, _collision_0_manifold = get_contact_manifolds(Vector(-1, 0), [Vector(49.5, 600), Vector(49.5, 400)], [Vector(49.5,400), Vector(49.5, 600)], [1, 1])
     collision_1_manifold, _collision_1_manifold = get_contact_manifolds(Vector(0, -1), [Vector(0, 599.5)], [Vector(0, 599.5)], [1])

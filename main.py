@@ -27,6 +27,7 @@ def physics_worker(scene: Scene, snapshots_buffer: Queue, stop_event):
     wait = False
     loaded_scene= Scene(**scene.get_fields())
     prev_time=perf_counter()
+
     while not stop_event.is_set():
         cur_buffer_size=snapshots_buffer.qsize()
         if cur_buffer_size < MIN_UNRENDERED_BUFFER_SIZE or wait == False:
@@ -40,9 +41,7 @@ def physics_worker(scene: Scene, snapshots_buffer: Queue, stop_event):
             past_time=(current_time-prev_time)
             prev_time=perf_counter()
             rtf= (PHYSICS_DT)/past_time
-        
             print(rtf, cur_buffer_size)
-            
         if cur_buffer_size >= MAX_BUFFER_SIZE:
             wait= True
     snapshots_buffer.close()
@@ -51,7 +50,44 @@ def physics_worker(scene: Scene, snapshots_buffer: Queue, stop_event):
 
             
 
-
+def event_handler(event_list, camera_pos, camera_zoom,camera_zooming, camera_moving, camera_speed, zoom_speed, run, pause):
+    for e in event_list:
+        if e.type == KEYDOWN:
+            if e.key == K_ESCAPE:   
+                run=False
+            if e.key == K_SPACE: 
+                pause = not pause
+            if e.key == K_F5:
+                loaded_scene.save_scene()
+            if e.key == K_F9:
+                loaded_scene=loaded_scene.restart()
+            if e.key == K_f:
+                camera_pos=[0,0]
+                camera_zoom=1
+    
+            if e.key == K_w:
+                camera_moving[1]+=camera_speed/camera_zoom
+            if e.key == K_s:
+                camera_moving[1]-=camera_speed/camera_zoom
+            if e.key == K_a:
+                camera_moving[0]-=camera_speed/camera_zoom
+            if e.key == K_d:
+                camera_moving[0]+=camera_speed/camera_zoom
+    
+            if e.key == K_z:
+                camera_zooming+= zoom_speed
+            if e.key == K_x:
+                camera_zooming-= zoom_speed
+        if e.type == KEYUP:
+            if e.key in (K_w, K_s):
+                camera_moving[1]=0
+            if e.key in (K_a, K_d):
+                camera_moving[0]=0
+            if e.key in (K_z, K_x):
+                camera_zooming=0
+        if e.type == QUIT:
+            run = False
+    return camera_pos, camera_zoom,camera_zooming, camera_moving, run, pause
 
 def main():  
     init()
@@ -84,53 +120,23 @@ def main():
 
 
     while run:
-        
-        renderer.render(screen, camera_pos, camera_zoom)
-        ux.display_fps(screen, clock)
-        display.flip()
-    
-        clock.tick(FPS)
+        try:
+            if pause == False:
+                renderer.render(screen, camera_pos, camera_zoom)
+            ux.display_fps(screen, clock)
+            display.flip()
+            clock.tick(FPS)
 
-        camera_zoom*=euler**camera_zooming
-        camera_pos[0]+=camera_moving[0]
-        camera_pos[1]+=camera_moving[1]
+            camera_zoom*=euler**camera_zooming
+            camera_pos[0]+=camera_moving[0]
+            camera_pos[1]+=camera_moving[1]
 
-        for e in event.get():
-            if e.type == KEYDOWN:
-                if e.key == K_ESCAPE:   
-                    run=False
-                if e.key == K_SPACE: 
-                    pause = not pause
-                if e.key == K_F5:
-                    loaded_scene.save_scene()
-                if e.key == K_F9:
-                    loaded_scene=loaded_scene.restart()
-                if e.key == K_f:
-                    camera_pos=[0,0]
-                    camera_zoom=1
+            camera_pos, camera_zoom, camera_zooming, camera_moving, run, pause = event_handler(event.get(), camera_pos, camera_zoom, camera_zooming,camera_moving, camera_speed, zoom_speed, run, pause)
 
-                if e.key == K_w:
-                    camera_moving[1]+=camera_speed/camera_zoom
-                if e.key == K_s:
-                    camera_moving[1]-=camera_speed/camera_zoom
-                if e.key == K_a:
-                    camera_moving[0]-=camera_speed/camera_zoom
-                if e.key == K_d:
-                    camera_moving[0]+=camera_speed/camera_zoom
+        except Exception as e:
+            print(e)
+            run = False
 
-                if e.key == K_z:
-                    camera_zooming+= zoom_speed
-                if e.key == K_x:
-                    camera_zooming-= zoom_speed
-            if e.type == KEYUP:
-                if e.key in (K_w, K_s):
-                    camera_moving[1]=0
-                if e.key in (K_a, K_d):
-                    camera_moving[0]=0
-                if e.key in (K_z, K_x):
-                    camera_zooming=0
-            if e.type == QUIT:
-                run = False
     stop_event.set()
     physics_process.kill()
     physics_process.join()

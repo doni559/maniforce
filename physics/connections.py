@@ -2,13 +2,13 @@ from .bodies import PhysicalObject
 from .utils import Vector, JointNodeState
 from .collider import Collider
 
-from configs.settings import GRAV_CONST, SUBSTEPS
+from configs.settings import GRAV_CONST, SECTOR_LENGTH
 
 from dataclasses import asdict, dataclass, field
 from typing import List
-from abc import ABC,abstractmethod
+from abc import ABC,abstractmethod 
 
-from pygame import Surface, draw 
+from math import ceil, pi, sqrt
 
 class JointEndpoint(ABC):
     @abstractmethod
@@ -129,11 +129,13 @@ class JointInitFields():
     anchor_0: PhysicalObject
     anchor_1: PhysicalObject | Vector
 
-    stiffness_cf: float
-    nodes_count: int
-    joint_mass: float
-    damping_cf : float
-    friction_cf: float
+    is_flexible: bool
+
+    damping_ratio: float = 0.2 
+    friction_cf: float = 0.01
+
+    youngs_modulus: float = 1
+    density: float = 1
     force_limit: float | None = None
 
 
@@ -146,13 +148,13 @@ class Joint():
         self.anchor_0 = init_fields.anchor_0
         self.anchor_1 = init_fields.anchor_1
 
-        
-        self.stiffness_cf = init_fields.stiffness_cf
-        self.damping_cf = init_fields.damping_cf
-        self.joint_mass = init_fields.joint_mass
-        self.nodes_count =init_fields.nodes_count
+        youngs_modulus = init_fields.youngs_modulus
+        density = init_fields.density*10**(-6)
+        damping_ratio = init_fields.damping_ratio
+
         self.friction_cf=init_fields.friction_cf
 
+        self.is_flexible = init_fields.is_flexible
         self.to_destroy = False
 
         self.sectors : List[JointSector] = []
@@ -173,13 +175,22 @@ class Joint():
             self.rope_length = (self.anchor_1-self.anchor_0.pos).get_length()
             last_node = WorldAnchor(self.anchor_1)
 
-        self.sector_len = self.rope_length/(self.nodes_count+1)
+        self.stiffness_cf=(pi*youngs_modulus)/self.rope_length
+        mass = density*pi*self.rope_length
 
+        if self.is_flexible == True:
+            self.nodes_count=ceil(self.rope_length/SECTOR_LENGTH)-1
+            self.node_mass=mass/self.nodes_count
+            self.sector_len=SECTOR_LENGTH
+        else:
+            self.nodes_count=0
+            self.node_mass=mass
+            self.sector_len=self.rope_length
+        self.damping_cf = 2*sqrt(self.stiffness_cf*self.node_mass/2) * damping_ratio
         self.endpoints.append(BodyAnchor(self.anchor_0))
         for N in range(0, self.nodes_count):
-            node_mass = self.joint_mass/self.nodes_count
             node_pos = self.anchor_0.pos+self.rope_normal * (self.sector_len*(N+1))
-            node = JointNode(node_pos, node_mass, friction_cf=self.friction_cf)
+            node = JointNode(node_pos, self.node_mass, friction_cf=self.friction_cf)
 
             self.endpoints.append(node)
 
@@ -187,10 +198,12 @@ class Joint():
         for N in range(0, (len(self.endpoints)-1)):
             node_a = self.endpoints[N]
             node_b = self.endpoints[N+1]
+
+            sector_len=(node_b.get_pos()-node_a.get_pos()).get_length()
             stiffness_cf = self.stiffness_cf
             damping_cf = self.damping_cf
 
-            sector = JointSector(node_a, node_b, stiffness_cf, self.sector_len, damping_cf, self.force_limit)
+            sector = JointSector(node_a, node_b, stiffness_cf, sector_len, damping_cf, self.force_limit)
             self.sectors.append(sector)
 
     def get_fields(self):
@@ -216,16 +229,6 @@ class Joint():
                 [start_point, vector]
             )
         return sectors
-            
-
-
-    def draw_joint(self, screen: Surface, camera_pos : List[float], camera_zoom: float):
-        for sector in self.sectors:
-            start_point = sector.node_a.get_pos()
-            end_point = sector.node_b.get_pos()
-
-            vector : Vector= end_point-start_point
-            vector.draw(screen, start_point, color=(0,0,0), camera_pos=camera_pos, camera_zoom=camera_zoom, width=4)
 
     
 

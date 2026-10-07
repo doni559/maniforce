@@ -38,12 +38,6 @@ class Collider():
         self.corners=new_corners
         return new_corners
         
-    def draw(self, screen, color, center : Tuple[int] | None = None, camera_pos: List[float] = [0,0], camera_zoom: float = 1):
-        if (self.type == "Circle"):
-            draw.circle(screen, color, center, radius=self.radius*camera_zoom)
-        if (self.type == "Box" or self.type == "Polygon"):
-            draw.polygon(screen,color, [point.convert_to_screen_cords(camera_pos, camera_zoom) for point in self.corners])
-
     def is_effectively_zero(self, number: float):
         return abs(number) <= EPS
 

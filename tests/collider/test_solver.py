@@ -1,7 +1,5 @@
-from .test_colliders import bodies
-from physics.utils import Vector, EulerIntegrator, VerletIntegrator
+from physics.utils import Vector, EulerIntegrator
 from physics.bodies import PhysicalObject
-from physics.solver import CollisionCalculator
 
 from configs.scenes_manager import Scene
 
@@ -50,7 +48,7 @@ def bodies(rectangular_body, circle_body):
     circle_0 = PhysicalObject(circle_body.get_fields())
     circle_1 = PhysicalObject(circle_body.get_fields())
 
-    scene = Scene(load=False, name="tests", used_integrator=VerletIntegrator(), objects=[rect_0,rect_1,circle_0,circle_1])
+    scene = Scene(load=False, name="tests", used_integrator=EulerIntegrator(), objects=[rect_0,rect_1,circle_0,circle_1])
     scene.step(0)
 
     return *scene.objects, scene

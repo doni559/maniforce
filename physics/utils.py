@@ -128,14 +128,26 @@ class JointNodeState():
     mass: float
 
 class Integrator(ABC):
+    def __init__(self, pre_integrations: int):
+        self.pre_integrations = pre_integrations
+
     @abstractmethod
-    def integrate(self, state: PhysicalObjectState, dt: float):...
+    def integrate(self, state: PhysicalObjectState, prev_acceleration: Vector|None, prev_angular_acceleration: float | None,  dt: float):...
+
+    @abstractmethod
+    def pre_integrate(self, state: PhysicalObjectState | JointNodeState, dt: float):...
 
     def __str__(self):
         return "Integrator"
 
+
 class EulerIntegrator(Integrator):
-    def integrate(self, state: PhysicalObjectState | JointNodeState, dt: float):
+    def __init__(self):
+        super().__init__(0)
+    def pre_integrate(self, state, dt):
+        return None
+
+    def integrate(self, state: PhysicalObjectState | JointNodeState,prev_acceleration: Vector|None, prev_angular_acceleration: float | None, dt: float):
         state.acceleration = state.resultant_force / state.mass
 
         state.velocity += state.acceleration * dt
@@ -150,11 +162,14 @@ class EulerIntegrator(Integrator):
             if state.angle // (2*pi) !=0 and state.angle != (2*pi) :
                 state.angle = state.angle - (state.angle//(2*pi)) *2*pi
         return state
-
+    
     def __str__(self):
         return "EulerIntegrator"
 
 class VerletIntegrator(Integrator):
+    def __init__(self):
+        super().__init__(1)
+
     def pre_integrate(self, state: PhysicalObjectState | JointNodeState, dt: float):
         state.acceleration = state.resultant_force / state.mass
         state.pos += state.velocity * dt + 0.5 * state.acceleration * dt**2

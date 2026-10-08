@@ -1,10 +1,14 @@
 from pygame import *
 from pygame.time import Clock
-from time import perf_counter
+from time import perf_counter,sleep
 
-from configs.scenes_manager import scene, Scene, load_scene
-from configs.settings import HEIGHT, WIDTH, FPS, PHYSICS_DT, MIN_UNRENDERED_BUFFER_SIZE, MAX_BUFFER_SIZE
+from physics.bodies import PhysicalObject, Obstacle
+from physics.utils import VerletIntegrator, EulerIntegrator
+
+from configs.scenes_manager import Scene, load_scene
+from configs.settings import HEIGHT, WIDTH, FPS, PHYSICS_DT, MIN_UNRENDERED_BUFFER_SIZE, MAX_BUFFER_SIZE, SUBSTEPS
 from configs.renderer import Renderer
+from configs.utils import MainParams, event_handler, ControlEvents
 
 from typing import Tuple
 
@@ -23,14 +27,30 @@ class UX():
     def display_fps(self, screen : Surface, clock: Clock):
         self.draw_text(f"{str(int(clock.get_fps()))} FPS", ( 10,10), (0,0,0), (255,255,255), screen)
 
-def physics_worker(scene: Scene, snapshots_buffer: Queue, stop_event):
+def physics_worker(scene: Scene, snapshots_buffer: Queue, **kwargs):
     wait = False
     loaded_scene= Scene(**scene.get_fields())
     prev_time=perf_counter()
+    stop_event = kwargs["stop_event"]
+    save_event = kwargs["save_event"]
+    reload_event = kwargs["reload_event"]
+    pause_event = kwargs["pause_event"]
 
     while not stop_event.is_set():
         cur_buffer_size=snapshots_buffer.qsize()
-        if cur_buffer_size < MIN_UNRENDERED_BUFFER_SIZE or wait == False:
+        if save_event.is_set():
+            loaded_scene.save_scene()
+            save_event.clear()
+        if reload_event.is_set():
+            loaded_scene = loaded_scene.restart()
+            try:
+                while cur_buffer_size > 0:
+                    snapshots_buffer.get_nowait()
+            except:
+                pass
+            reload_event.clear()
+
+        if (cur_buffer_size < MIN_UNRENDERED_BUFFER_SIZE or wait == False) and not pause_event.is_set():
             if wait == True:
                 wait=False
             
@@ -42,66 +62,15 @@ def physics_worker(scene: Scene, snapshots_buffer: Queue, stop_event):
             prev_time=perf_counter()
             rtf= (PHYSICS_DT)/past_time
             print(rtf, cur_buffer_size)
-        if cur_buffer_size >= MAX_BUFFER_SIZE:
+        else:
+            sleep(0.2)
+        if snapshots_buffer.full():
             wait= True
     snapshots_buffer.close()
     return
 
-
-            
-
-def event_handler(event_list, camera_pos, camera_zoom,camera_zooming, camera_moving, camera_speed, zoom_speed, run, pause):
-    for e in event_list:
-        if e.type == KEYDOWN:
-            if e.key == K_ESCAPE:   
-                run=False
-            if e.key == K_SPACE: 
-                pause = not pause
-            if e.key == K_F5:
-                loaded_scene.save_scene()
-            if e.key == K_F9:
-                loaded_scene=loaded_scene.restart()
-            if e.key == K_f:
-                camera_pos=[0,0]
-                camera_zoom=1
-    
-            if e.key == K_w:
-                camera_moving[1]+=camera_speed/camera_zoom
-            if e.key == K_s:
-                camera_moving[1]-=camera_speed/camera_zoom
-            if e.key == K_a:
-                camera_moving[0]-=camera_speed/camera_zoom
-            if e.key == K_d:
-                camera_moving[0]+=camera_speed/camera_zoom
-    
-            if e.key == K_z:
-                camera_zooming+= zoom_speed
-            if e.key == K_x:
-                camera_zooming-= zoom_speed
-        if e.type == KEYUP:
-            if e.key in (K_w, K_s):
-                camera_moving[1]=0
-            if e.key in (K_a, K_d):
-                camera_moving[0]=0
-            if e.key in (K_z, K_x):
-                camera_zooming=0
-        if e.type == QUIT:
-            run = False
-    return camera_pos, camera_zoom,camera_zooming, camera_moving, run, pause
-
 def main():  
     init()
-    run= True
-    pause = False
-
-    camera_speed= 10
-    camera_pos = [0 , 0]
-    camera_moving=[0, 0]
-    
-    camera_zooming = 0
-    camera_zoom=euler**0
-    zoom_speed=0.01
-
 
     display.set_mode((WIDTH, HEIGHT))
 
@@ -112,32 +81,48 @@ def main():
     renderer = Renderer(snapshot_buffer)
     ux= UX(50)
 
-    loaded_scene = scene
-    stop_event=Event()
+    
+    screen_borders = [
+        Obstacle(0,WIDTH, HEIGHT, HEIGHT+100),
+        Obstacle(0,WIDTH, -100, 0),
+        Obstacle(-100, 0, 0, HEIGHT),
+        Obstacle(WIDTH, WIDTH+100, 0, HEIGHT),
+    ]
 
-    physics_process = Process(target=physics_worker, args=(loaded_scene, snapshot_buffer, stop_event))
+    scene_to_load = "pendulum_cart_test"
+    scene = Scene(load=True, name=scene_to_load, obstacles=screen_borders, substeps=SUBSTEPS, used_integrator=VerletIntegrator())
+
+    params = MainParams()
+    control = ControlEvents()
+
+    physics_process = Process(target=physics_worker, args=(scene, snapshot_buffer, ), kwargs={**control.__dict__})
     physics_process.start()
 
 
-    while run:
+    while params.run:
         try:
-            if pause == False:
-                renderer.render(screen, camera_pos, camera_zoom)
+            if params.pause == False:
+                control.pause_event.clear()
+                if not control.reload_event.is_set():
+                    renderer.render(screen, params.camera_pos, params.camera_zoom)
+            else:
+                control.pause_event.set()
+
             ux.display_fps(screen, clock)
             display.flip()
             clock.tick(FPS)
 
-            camera_zoom*=euler**camera_zooming
-            camera_pos[0]+=camera_moving[0]
-            camera_pos[1]+=camera_moving[1]
+            params.camera_zoom*=euler**params.camera_zooming
+            params.camera_pos[0]+=params.camera_moving[0]
+            params.camera_pos[1]+=params.camera_moving[1]
 
-            camera_pos, camera_zoom, camera_zooming, camera_moving, run, pause = event_handler(event.get(), camera_pos, camera_zoom, camera_zooming,camera_moving, camera_speed, zoom_speed, run, pause)
+            event_handler(params, control)
 
         except Exception as e:
             print(e)
-            run = False
+            params.run = False
 
-    stop_event.set()
+    control.stop_event.set()
     physics_process.kill()
     physics_process.join()
     quit()

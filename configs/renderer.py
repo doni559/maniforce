@@ -1,17 +1,9 @@
-from physics.bodies import PhysicalObject, Obstacle
-from physics.connections import Joint
-from physics.utils import Vector
-
-from configs.scenes_manager import SceneSnapshot, ObjectSnapshot
-from configs.settings import PHYSICS_DT
+from configs.scenes_manager import SceneSnapshot
 
 from pygame import draw, Surface
-from pygame.time import Clock
 
 from multiprocessing import Queue
 from queue import Empty
-
-from time import perf_counter
 
 from typing import List
 
@@ -31,13 +23,13 @@ class Renderer():
 
         for object in objects_to_draw:
             points=[point.convert_to_screen_cords(camera_pos, camera_zoom) for point in object.points]
-            if object.type is Joint:
+            if object.type == "joint":
                 points=object.points
                 vector= points[1]
                 start_pos = points[0]
 
                 vector.draw(screen, start_pos=start_pos, color=(0,0,0), camera_pos=camera_pos, camera_zoom=camera_zoom, width=object.width)
-            elif object.type is PhysicalObject:
+            elif object.type == "object":
                 color = (0, 255, 0)
                 if object.form == "Circle":
                     center = points[0]
@@ -54,7 +46,7 @@ class Renderer():
                         color=color,
                         points=points
                     )
-            elif object.type is Obstacle:
+            elif object.type == "obstacle":
                 if object.form == "Polygon":
                     draw.polygon(
                         screen,

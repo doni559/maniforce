@@ -1,12 +1,10 @@
-from pygame.sprite import Group
-
 from physics.utils import Vector, Integrator, EulerIntegrator, VerletIntegrator
 from physics.bodies import PhysicalObject, Obstacle, ObjectConfig, PhysicalObjectInitFields
 from physics.solver import CollisionCalculator
 from physics.connections import Joint, JointInitFields, JointNode
 
 
-from configs.settings import WIDTH, HEIGHT, SUBSTEPS
+from configs.settings import SUBSTEPS
 
 from typing import List
 
@@ -14,13 +12,11 @@ from pathlib import Path
 import json
 from dataclasses import asdict, dataclass
 
-from configs.materials import ball, box, polygon, rope
-
 @dataclass(frozen=True, slots=True)
 class ObjectSnapshot():
     id = int
 
-    type: Joint | PhysicalObject | Obstacle | None
+    type: str
     form: str
     points: List[Vector]
     width : float | None = None
@@ -33,14 +29,23 @@ class SceneSnapshot():
     objects: List[ObjectSnapshot]   
 
 class Scene():
-    def __init__(self, load:bool, name:str,used_integrator : Integrator, objects: List[PhysicalObject]=[], obstacles: List[Obstacle]=[], joints : List[Joint] = [], substeps: int = SUBSTEPS):
+    def __init__(self, load:bool, name:str,used_integrator : Integrator, objects: List[PhysicalObject] | None = None, obstacles: List[Obstacle] | None= None, joints : List[Joint] | None = None, substeps: int = SUBSTEPS):
         if load == False:
             self.name= name
             self.used_integrator = used_integrator
 
-            self.objects = objects
-            self.obstacles = obstacles
-            self.joints = joints
+            if objects is not None:
+                self.objects = objects
+            else:
+                self.objects = []
+            if obstacles is not None:
+                self.obstacles = obstacles
+            else:
+                self.obstacles = []
+            if joints is not None:
+                self.joints = joints
+            else:
+                self.joints = []
             self.substeps = substeps
 
             self.collisions=CollisionCalculator(self.objects, self.obstacles, self.joints)
@@ -50,38 +55,15 @@ class Scene():
     def step(self, dt: float):
         joint_to_destroy = []
         for _ in range(0,self.substeps):
-            if isinstance(self.used_integrator, EulerIntegrator):
-                for joint in self.joints:
-                    joint.calculate()
-                    if joint.to_destroy == True:
-                        joint_to_destroy.append(joint)
-                for sprite in self.objects:
-                    sprite: PhysicalObject = sprite
-                    sprite.calc_forces()
-
-                    state = sprite.get_state()
-                    new_state = self.used_integrator.integrate(state, dt/self.substeps)
-                    sprite.apply_state(new_state)                    
-
-                for joint in self.joints:
-                    for endpoint in joint.endpoints:
-                        if isinstance(endpoint, JointNode):
-                            state = endpoint.get_state()
-                            new_state = self.used_integrator.integrate(state, dt/self.substeps)
-                            endpoint.apply_state(new_state)
-                self.collisions.calculate_collisions_penalty()
-                
-                
-            elif isinstance(self.used_integrator, VerletIntegrator):
-                for joint in self.joints:
-                    joint.calculate()
-                    if joint.to_destroy == True:
-                        joint_to_destroy.append(joint)
+            for joint in self.joints:
+                joint.calculate()
+                if joint.to_destroy == True:
+                    joint_to_destroy.append(joint)
+            for i in range(self.used_integrator.pre_integrations):
                 for sprite in self.objects:
                     sprite: PhysicalObject = sprite
                     sprite.calc_forces()
                     state = sprite.get_state()
-
                     new_state = self.used_integrator.pre_integrate(state, dt/self.substeps)
                     sprite.apply_state(new_state)
                 for joint in self.joints:
@@ -95,23 +77,22 @@ class Scene():
                     if joint.to_destroy == True:
                         joint_to_destroy.append(joint)
                 self.collisions.calculate_collisions_penalty()
-
-                for sprite in self.objects:
-                    sprite.calc_forces()
-                    state = sprite.get_state()
-                    old_acceleration = state.acceleration
-                    old_angular_acceleration = state.angular_acceleration
-                    new_state = self.used_integrator.integrate(state, old_acceleration, old_angular_acceleration, dt/self.substeps)
-                    sprite.apply_state(new_state)
-                    
-                for joint in self.joints:
-                    for endpoint in joint.endpoints:
-                        if isinstance(endpoint, JointNode):
-                            state = endpoint.get_state()
-                            old_acceleration = state.acceleration
-                            new_state = self.used_integrator.integrate(state, old_acceleration, None, dt/self.substeps)
-                            endpoint.apply_state(new_state)
-                self.collisions.calculate_collisions_penalty()
+            for sprite in self.objects:
+                sprite.calc_forces()
+                state = sprite.get_state()
+                old_acceleration = state.acceleration
+                old_angular_acceleration = state.angular_acceleration
+                new_state = self.used_integrator.integrate(state, old_acceleration, old_angular_acceleration, dt/self.substeps )
+                sprite.apply_state(new_state)
+                
+            for joint in self.joints:
+                for endpoint in joint.endpoints:
+                    if isinstance(endpoint, JointNode):
+                        state = endpoint.get_state()
+                        old_acceleration = state.acceleration
+                        new_state = self.used_integrator.integrate(state, old_acceleration, None,dt/self.substeps)
+                        endpoint.apply_state(new_state)
+            self.collisions.calculate_collisions_penalty()
         for joint in joint_to_destroy:
             self.remove_joint(joint)
         
@@ -126,7 +107,7 @@ class Scene():
                 center = collider.center
                 form = "Circle"
                 snapshot = ObjectSnapshot(
-                    type=PhysicalObject,
+                    type="object",
                     form = form,
                     points=[center],
                     radius=radius,
@@ -136,7 +117,7 @@ class Scene():
                 points = collider.get_world_corners(obj)
                 form = "Polygon"
                 snapshot=ObjectSnapshot(
-                    type=PhysicalObject,
+                    type="object",
                     form=form,
                     points=points,
                     angle=angle
@@ -146,7 +127,7 @@ class Scene():
             if obj.draw_trajectory == True:
                 for trajectory_point in obj.trajectory_arr:
                     snapshot=ObjectSnapshot(
-                        type=None,
+                        type="trajectory",
                         form="Circle",
                         points=[trajectory_point],
                         radius=3
@@ -159,7 +140,7 @@ class Scene():
             points=collider.corners
 
             snapshot=ObjectSnapshot(
-                type=Obstacle,
+                type="obstacle",
                 form=form,
                 points=points
             )
@@ -171,7 +152,7 @@ class Scene():
             for line in lines:
                 points = line
                 snapshot = ObjectSnapshot(
-                    type=Joint,
+                    type="joint",
                     form=form,
                     points=points,
                     width=width
@@ -312,14 +293,5 @@ def load_scene(name, used_integrator: Integrator, path: str = "./scenes/", subst
     scene = Scene(load=False, name=name, objects=objects_list, obstacles=obstacles_list, joints=joints_list, substeps=substeps, used_integrator=used_integrator)
     return scene
 
-screen_borders = [
-    Obstacle(0,WIDTH, HEIGHT, HEIGHT+100),
-    Obstacle(0,WIDTH, -100, 0),
-    Obstacle(-100, 0, 0, HEIGHT),
-    Obstacle(WIDTH, WIDTH+100, 0, HEIGHT),
-]
-
-scene_to_load = "pendulum_cart_test"
-scene = Scene(load=True, name=scene_to_load, obstacles=screen_borders, substeps=SUBSTEPS, used_integrator=VerletIntegrator())
 
 

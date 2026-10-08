@@ -1,13 +1,13 @@
 from pygame import sprite
 
-from dataclasses import dataclass, asdict
-from typing import List, Tuple
+from dataclasses import dataclass
+from typing import List
 from math import radians, degrees, pi
 
 from .collider import Collider
 
 from .utils import Vector, PhysicalObjectState
-from configs.settings import SUBSTEPS, GRAV_CONST
+from configs.settings import GRAV_CONST
 
 @dataclass(frozen=True)
 class ObjectConfig():

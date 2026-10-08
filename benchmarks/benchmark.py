@@ -1,8 +1,7 @@
 from configs.scenes_manager import Scene, load_scene
-from configs.materials import ball
 from configs.settings import GRAV_CONST
 
-from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from os import cpu_count
 
 from physics.utils import Vector, Integrator, EulerIntegrator, VerletIntegrator

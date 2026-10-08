@@ -87,6 +87,7 @@ class JointNode(JointEndpoint):
         self.velocity=state.velocity
         self.pos=state.pos
         self.acceleration=state.acceleration 
+        self.collider.center = self.pos
         self.resultant_force=Vector(0,-GRAV_CONST*self.mass)
 
 @dataclass
@@ -109,12 +110,11 @@ class JointSector():
 
         elong = length-self.rest_length
         self.elong = elong
-
         spring_force = normal * elong * self.stiffnes_cf
 
         relative_velocity = (self.node_b.get_velocity()-self.node_a.get_velocity())
         damping_force = normal * self.damping_cf * relative_velocity.scalar_multiply(normal)
-
+        
         resultant_force = spring_force+ damping_force
 
         if resultant_force.get_length() > self.force_limit:
@@ -136,6 +136,10 @@ class JointInitFields():
 
     youngs_modulus: float = 1
     density: float = 1
+
+    first_sector_len: float | None = None
+    nodes_count: int | None = None
+    rope_length: float | None = None
     force_limit: float | None = None
 
 
@@ -148,9 +152,9 @@ class Joint():
         self.anchor_0 = init_fields.anchor_0
         self.anchor_1 = init_fields.anchor_1
 
-        youngs_modulus = init_fields.youngs_modulus
-        density = init_fields.density*10**(-6)
-        damping_ratio = init_fields.damping_ratio
+        self.youngs_modulus = init_fields.youngs_modulus
+        self.density = init_fields.density
+        self.damping_ratio = init_fields.damping_ratio
 
         self.friction_cf=init_fields.friction_cf
 
@@ -168,44 +172,84 @@ class Joint():
         
         if isinstance(self.anchor_1, PhysicalObject):
             self.rope_normal = (self.anchor_1.pos-self.anchor_0.pos).normalise()
-            self.rope_length= (self.anchor_1.pos-self.anchor_0.pos).get_length()
             last_node = BodyAnchor(self.anchor_1)
+            if init_fields.rope_length is None:
+                self.rope_length= (self.anchor_1.pos-self.anchor_0.pos).get_length()
+                actual_length=self.rope_length
+            else:
+                self.rope_length = init_fields.rope_length
+                actual_length=(self.anchor_1.pos-self.anchor_0.pos).get_length()
+
+
         else:
             self.rope_normal= (self.anchor_1-self.anchor_0.pos).normalise()
-            self.rope_length = (self.anchor_1-self.anchor_0.pos).get_length()
             last_node = WorldAnchor(self.anchor_1)
+            if init_fields.rope_length is None:
+                self.rope_length = (self.anchor_1-self.anchor_0.pos).get_length()
+                actual_length=self.rope_length
 
-        self.stiffness_cf=(pi*youngs_modulus)/self.rope_length
-        mass = density*pi*self.rope_length
+            else:
+                self.rope_length = init_fields.rope_length
+                actual_length=(self.anchor_1-self.anchor_0.pos).get_length()
 
+
+
+        self.mass = self.density*pi*self.rope_length*10**(-6)
         if self.is_flexible == True:
-            self.nodes_count=ceil(self.rope_length/SECTOR_LENGTH)-1
-            self.node_mass=mass/self.nodes_count
-            self.sector_len=SECTOR_LENGTH
+            if init_fields.nodes_count is None:
+                self.nodes_count=max(1, ceil(self.rope_length/SECTOR_LENGTH)-1)
+            else:
+                self.nodes_count = init_fields.nodes_count
+            self.node_mass=self.mass/self.nodes_count
+            self.sector_len=self.rope_length/(self.nodes_count+1)
         else:
             self.nodes_count=0
-            self.node_mass=mass
+            self.node_mass=self.mass
             self.sector_len=self.rope_length
-        self.damping_cf = 2*sqrt(self.stiffness_cf*self.node_mass/2) * damping_ratio
+
         self.endpoints.append(BodyAnchor(self.anchor_0))
+        last_pos=0
+        sectors_len=[]
+        self.first_sector_len=init_fields.first_sector_len
+
         for N in range(0, self.nodes_count):
-            node_pos = self.anchor_0.pos+self.rope_normal * (self.sector_len*(N+1))
+            if actual_length == self.rope_length:
+
+                if (N == 0):
+                    sector_len=(self.rope_length-SECTOR_LENGTH*(self.nodes_count-1))/2
+                    sectors_len.append(sector_len)
+                    last_pos+=sector_len
+                    node_pos = self.anchor_0.pos+self.rope_normal * last_pos
+                else:
+                    last_pos+=SECTOR_LENGTH
+                    sectors_len.append(SECTOR_LENGTH)
+
+                node_pos = self.anchor_0.pos+self.rope_normal * last_pos
+            else:
+                if N == 0:
+                    sector_len = self.first_sector_len
+                else:
+                    sector_len = SECTOR_LENGTH
+                sectors_len.append(sector_len)
+                last_pos += sector_len
+                node_pos = self.anchor_0.pos+self.rope_normal * (last_pos)
             node = JointNode(node_pos, self.node_mass, friction_cf=self.friction_cf)
 
             self.endpoints.append(node)
-
+        self.first_sector_len=sectors_len[0]
+        sectors_len.append(self.first_sector_len)
         self.endpoints.append(last_node)
+        
         for N in range(0, (len(self.endpoints)-1)):
             node_a = self.endpoints[N]
             node_b = self.endpoints[N+1]
 
-            sector_len=(node_b.get_pos()-node_a.get_pos()).get_length()
-            stiffness_cf = self.stiffness_cf
-            damping_cf = self.damping_cf
+            sector_len=sectors_len[N]
+            stiffness_cf = self.youngs_modulus*pi/sector_len
+            damping_cf = 2*sqrt(stiffness_cf*self.node_mass/self.nodes_count) * self.damping_ratio
 
             sector = JointSector(node_a, node_b, stiffness_cf, sector_len, damping_cf, self.force_limit)
             self.sectors.append(sector)
-
     def get_fields(self):
         return JointInitFields(**{k: v for k, v in self.__dict__.items() if k in JointInitFields.__dataclass_fields__})
 

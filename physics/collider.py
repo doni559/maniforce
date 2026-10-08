@@ -1,9 +1,7 @@
-from pygame import draw
-
 from typing import Tuple, List
 
 from .utils import Vector
-from configs.settings import HEIGHT, EPS
+from configs.settings import EPS
 class Collider():
     def __init__(self, collider_type : str , center : Vector,**kwargs):
         possible_types = [
